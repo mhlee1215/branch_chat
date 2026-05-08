@@ -72,8 +72,8 @@ synthesizeButton.addEventListener('click', () => {
   pendingBranchBlockId = null;
   pendingTextBranchSelection = null;
   if (!workspace) {
-    workspace = createDemoWorkspace();
-    mobileActiveColumn = workspace.activeBranchId || 'root';
+    workspace = startDemoAtRoot(createDemoWorkspace());
+    mobileActiveColumn = 'root';
     appView = 'chat';
   } else {
     workspace = synthesizeWorkspace(workspace);
@@ -424,9 +424,18 @@ function renderRootColumn() {
   const column = createColumn('root', workspaceTitle(), workspaceSummary());
   const body = column.querySelector('.column-body');
   body.append(...workspace.blocks.filter((block) => block.messageId === workspace.rootMessageId).map((block) => renderBlock(block)));
-  column.append(renderColumnComposer('Ask anything about this answer', (question) => askColumnQuestion(workspace.blocks.find((block) => block.messageId === workspace.rootMessageId), question)));
-  appendPendingBranchComposer(column);
+  if (!appendPendingBranchComposer(column)) {
+    column.append(renderColumnComposer('Ask anything about this answer', (question) => askColumnQuestion(workspace.blocks.find((block) => block.messageId === workspace.rootMessageId), question)));
+  }
   return column;
+}
+
+function startDemoAtRoot(demoWorkspace) {
+  return {
+    ...demoWorkspace,
+    activeBranchId: null,
+    branches: demoWorkspace.branches.map((branch) => ({ ...branch, isOpen: false })),
+  };
 }
 
 function workspaceTitle() {
@@ -459,26 +468,34 @@ function renderBranchColumn(branch) {
     if (message.role !== 'user') body.append(renderMessage(message));
   });
   const firstBlock = workspace.blocks.find((block) => block.messageId === messages.find((message) => message.role === 'assistant')?.id);
-  column.append(renderColumnComposer('Ask anything about this column', (question) => askColumnQuestion(firstBlock, question)));
-  appendPendingBranchComposer(column);
+  if (!appendPendingBranchComposer(column)) {
+    column.append(renderColumnComposer('Ask anything about this column', (question) => askColumnQuestion(firstBlock, question)));
+  }
   return column;
 }
 
 function appendPendingBranchComposer(column) {
   if (pendingBranchBlockId) {
     const pendingBlock = workspace.blocks.find((block) => block.id === pendingBranchBlockId);
-    if (!pendingBlock) return;
+    if (!pendingBlock) return false;
     const belongsToColumn = column.dataset.columnId === columnIdForBlock(pendingBlock);
-    if (belongsToColumn) column.append(renderBranchQuestionComposer(pendingBlock));
-    return;
+    if (belongsToColumn) {
+      column.append(renderBranchQuestionComposer(pendingBlock));
+      return true;
+    }
+    return false;
   }
 
   if (pendingTextBranchSelection) {
     const parentBlock = workspace.blocks.find((block) => block.id === pendingTextBranchSelection.blockId);
-    if (!parentBlock) return;
+    if (!parentBlock) return false;
     const belongsToColumn = column.dataset.columnId === columnIdForBlock(parentBlock);
-    if (belongsToColumn) column.append(renderTextSelectionQuestionComposer(pendingTextBranchSelection));
+    if (belongsToColumn) {
+      column.append(renderTextSelectionQuestionComposer(pendingTextBranchSelection));
+      return true;
+    }
   }
+  return false;
 }
 
 function columnIdForBlock(block) {
