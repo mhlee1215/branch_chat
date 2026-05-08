@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Branching Chat Demo</title>
+    <link rel="stylesheet" href="/app/demo.css">
+  </head>
+  <body>
+    <main class="demo-shell">
+      <aside class="chat-pane" aria-label="Chat transcript">
+        <header class="chat-header">
+          <button type="button" class="ghost-button">☰</button>
+          <strong>ChatGPT 4o</strong>
+          <span>⌄</span>
+        </header>
+
+        <section class="chat-scroll">
+          <article class="assistant-copy markdown">
+            <p>Here's a comprehensive guide on creating a lead generation funnel for a small business on a tight budget.</p>
+            <p>Let me know if you'd like to expand on any specific sections or add examples tailored to a particular industry.</p>
+          </article>
+
+          <div class="asked-label">↳ Asked ChatGPT</div>
+          <article class="user-bubble">
+            Provide one example for each. The example should be relevant for a small D2C business that sells hair care products.
+          </article>
+
+          <article class="assistant-copy edited markdown">
+            <span>Edited</span>
+            <p>I've added specific examples relevant to a small D2C hair care business for each lead magnet type.</p>
+          </article>
+
+          <div class="asked-label">↳ Asked ChatGPT</div>
+          <article class="user-bubble compact">
+            Turn the ebook example into a landing page section.
+          </article>
+        </section>
+
+        <footer class="chat-composer floating-composer">
+          <textarea rows="2" placeholder="Ask anything"></textarea>
+          <div>
+            <button type="button">＋</button>
+            <button type="button">Tools</button>
+            <button type="button" class="send">●</button>
+          </div>
+        </footer>
+      </aside>
+
+      <section class="column-stage" aria-label="Finder-style branch columns">
+        <section class="column root-column">
+          <header class="column-top">
+            <button type="button">×</button>
+            <h1>Lead Generation Funnel</h1>
+            <div class="column-actions">↶ ↷ ⧉</div>
+          </header>
+
+          <article class="document markdown">
+            <section class="semantic-block">
+              <p>Start by identifying the audience's immediate problem, the language they use to describe it, and the channel where they already spend attention.</p>
+            </section>
+
+            <section class="semantic-block selected-block selected-for-merge">
+              <p>A lead magnet is something useful offered in exchange for contact information. It should solve one narrow problem quickly enough that a prospect wants it now.</p>
+            </section>
+            <section class="semantic-block selected-block selected-for-merge">
+              <p>Examples include <strong>ebooks</strong>, <strong>templates</strong>, <strong>discount codes</strong>, and <strong>free trials</strong>. For a small D2C hair care brand, each option should connect directly to a purchase path.</p>
+              <ul>
+                <li><strong>Ebooks:</strong> Create a short, actionable guide. For example, "10 DIY Hair Masks for Healthier Hair Using Kitchen Ingredients."</li>
+                <li><strong>Templates:</strong> Provide ready-to-use resources. For example, a "Weekly Hair Care Routine Planner" template.</li>
+                <li><strong>Discount Codes:</strong> Offer a percentage off the first purchase. For example, "Get 15% off your first order."</li>
+                <li><strong>Free Trials:</strong> Let prospects experience the product. For example, "Try a travel-size shampoo and conditioner for free."</li>
+              </ul>
+            </section>
+
+            <div class="selection-toolbar merge-toolbar">Merge 2 selected blocks</div>
+
+            <section class="semantic-block split-demo-block">
+              <p>The landing page should focus on one offer, one promise, and one action. <mark>Keep the form short and place the CTA near the moment of highest interest.</mark> Remove navigation, extra links, and competing offers.</p>
+              <div class="selection-toolbar split-toolbar">Split selection into 3 blocks</div>
+            </section>
+          </article>
+        </section>
+
+        <section class="column detail-column">
+          <header class="column-top">
+            <button type="button">×</button>
+            <h1>Lead Magnet Examples</h1>
+            <div class="column-actions">Pin Export</div>
+          </header>
+          <article class="branch-thread">
+            <p class="source-label">Source block: Step 2 lead magnet examples</p>
+            <div class="question-card">Provide one example for each lead magnet type for a D2C hair care brand.</div>
+            <div class="answer-block active markdown">
+              <p>Create a short guide called "10 DIY Hair Masks for Healthier Hair Using Kitchen Ingredients."</p>
+            </div>
+            <div class="answer-block markdown">
+              <p>Offer a weekly hair care routine planner for wash days, treatments, and product usage.</p>
+            </div>
+            <div class="answer-block markdown">
+              <p>Give 15% off the first order in exchange for an email address.</p>
+            </div>
+          </article>
+          <footer class="column-composer floating-composer">
+            <textarea rows="2" placeholder="Ask anything about this column"></textarea>
+          </footer>
+        </section>
+
+        <section class="column detail-column">
+          <header class="column-top">
+            <button type="button">×</button>
+            <h1>Ebook Landing Section</h1>
+            <div class="column-actions">Pin Export</div>
+          </header>
+          <article class="branch-thread">
+            <p class="source-label">Source block: Ebook example</p>
+            <div class="question-card">Turn this ebook idea into a landing page section.</div>
+            <div class="answer-block active markdown">
+              <p>Send me the free hair mask guide.</p>
+            </div>
+            <div class="answer-block markdown">
+              <p>Get 10 simple hair mask recipes you can make tonight.</p>
+            </div>
+            <div class="answer-block markdown">
+              <p>Ask only for first name and email.</p>
+            </div>
+          </article>
+          <footer class="column-composer floating-composer">
+            <textarea rows="2" placeholder="Ask anything about this column"></textarea>
+          </footer>
+        </section>
+
+        <section class="column detail-column">
+          <header class="column-top">
+            <button type="button">×</button>
+            <h1>CTA Variants</h1>
+            <div class="column-actions">Pin Export</div>
+          </header>
+          <article class="branch-thread">
+            <p class="source-label">Depth 3 branch</p>
+            <div class="question-card">Give me three stronger CTA variants.</div>
+            <ol class="variant-list">
+              <li>Send my free hair mask guide</li>
+              <li>Get the 10-recipe hair repair guide</li>
+              <li>Start my healthier hair routine</li>
+            </ol>
+          </article>
+          <footer class="column-composer floating-composer">
+            <textarea rows="2" placeholder="Ask anything about this column"></textarea>
+          </footer>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

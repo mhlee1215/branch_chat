@@ -1,0 +1,9 @@
+{
+  "name": "Branching Chat GUI",
+  "short_name": "Branch Chat",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f3ec",
+  "theme_color": "#246b61",
+  "icons": []
+}

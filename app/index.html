@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f6f3ec">
+    <title>Branching Chat GUI</title>
+    <link rel="manifest" href="/app/manifest.webmanifest">
+    <link rel="stylesheet" href="/app/styles.css">
+  </head>
+  <body data-view="chat">
+    <main class="shell">
+      <aside class="app-sidebar" aria-label="Primary navigation">
+        <div class="sidebar-header">
+          <button class="sidebar-toggle" id="sidebarToggle" type="button" title="Collapse sidebar">
+            <span class="sidebar-toggle-icon" aria-hidden="true"><span></span></span>
+            <span class="sr-only">Collapse sidebar</span>
+          </button>
+          <div class="sidebar-brand">
+            <strong>Branching Chat</strong>
+            <span>Research workspace</span>
+          </div>
+        </div>
+
+        <button class="sidebar-primary" id="newChatButton" type="button">+ New chat</button>
+
+        <nav class="sidebar-nav" aria-label="Workspace sections">
+          <button class="sidebar-item active" type="button" data-view="chat">
+            <span>Chat</span>
+            <small>Branching Q&A</small>
+          </button>
+          <button class="sidebar-item" type="button" data-view="papers">
+            <span>Papers</span>
+            <small>Reading queue</small>
+          </button>
+          <button class="sidebar-item" type="button" data-view="notes">
+            <span>Notes</span>
+            <small>Research notes</small>
+          </button>
+          <button class="sidebar-item" type="button" data-view="synthesis">
+            <span>Synthesis</span>
+            <small>Branch summary</small>
+          </button>
+        </nav>
+
+        <section class="sidebar-section" aria-label="Recent work">
+          <p>Recent</p>
+          <button type="button" data-view="chat">Transformer basics</button>
+          <button type="button" data-view="papers">Attention paper notes</button>
+          <button type="button" data-view="notes">Open questions</button>
+        </section>
+
+        <div class="sidebar-footer">
+          <span class="provider-pill" id="providerStatus">Checking API</span>
+          <div class="sidebar-controls">
+            <button class="sidebar-settings" id="settingsButton" type="button">Settings</button>
+            <button class="sidebar-settings" id="synthesizeButton" type="button" title="Show demo or create synthesis">Demo</button>
+          </div>
+        </div>
+      </aside>
+
+      <section class="composer" aria-label="Initial question">
+        <div class="welcome-copy">
+          <p>Hi</p>
+          <h1>Where should we start?</h1>
+        </div>
+        <div class="chatbox">
+          <label class="sr-only" for="questionInput">Message</label>
+          <textarea id="questionInput" rows="2" placeholder="Ask anything"></textarea>
+          <div class="composer-actions">
+            <div class="tool-row" aria-label="Tools">
+              <button class="tool-button" type="button" title="Attach">+</button>
+              <button class="tool-button" type="button" title="Tools">Tools</button>
+            </div>
+            <button id="startButton" type="button">Send</button>
+          </div>
+        </div>
+        <div class="prompt-chips" aria-label="Prompt shortcuts">
+          <button type="button">Help me learn</button>
+          <button type="button">Write anything</button>
+          <button type="button">Analyze a paper</button>
+          <button type="button">Plan a project</button>
+        </div>
+      </section>
+
+      <nav class="branch-rail" id="branchRail" aria-label="Branch navigation"></nav>
+
+      <section class="workspace-wrap" id="workspaceWrap">
+        <section class="workspace" id="workspace" aria-label="Branching conversation workspace"></section>
+      </section>
+
+      <section class="view-panel" id="viewPanel" aria-live="polite"></section>
+
+      <aside class="summary-panel" id="summaryPanel" aria-live="polite"></aside>
+
+      <dialog class="settings-dialog" id="settingsDialog">
+        <form class="settings-form" method="dialog">
+          <header>
+            <div>
+              <p class="eyebrow">Provider</p>
+              <h2>OpenAI settings</h2>
+            </div>
+            <button class="tool-button" value="cancel" type="submit">Close</button>
+          </header>
+          <label>
+            API key
+            <input id="apiKeyInput" type="password" autocomplete="off" placeholder="sk-...">
+          </label>
+          <label>
+            Model
+            <select id="modelInput">
+              <option value="gpt-5.4-mini">gpt-5.4-mini</option>
+              <option value="gpt-5.4">gpt-5.4</option>
+              <option value="gpt-5.5">gpt-5.5</option>
+            </select>
+          </label>
+          <label class="check-row">
+            <input id="persistSettingsInput" type="checkbox">
+            Save to local .env
+          </label>
+          <p class="settings-note">The key is sent only to the local server. Browser code never calls OpenAI directly.</p>
+          <button id="saveSettingsButton" type="button">Save settings</button>
+        </form>
+      </dialog>
+    </main>
+
+    <script type="module" src="/app/main.js"></script>
+  </body>
+</html>
