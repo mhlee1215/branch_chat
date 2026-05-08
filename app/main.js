@@ -42,6 +42,7 @@ let isBusy = false;
 let selectedBlockIds = new Set();
 let contextMenuEl = null;
 let selectionMenuEl = null;
+let depthMenuEl = null;
 let activeTextSelection = null;
 let pendingColumnFocusId = null;
 let savedScrollPositions = new Map();
@@ -199,6 +200,7 @@ async function loadRuntimeConfig() {
 function render() {
   hideContextMenu();
   hideSelectionMenu();
+  hideDepthMenu();
   captureScrollPositions();
   document.body.classList.toggle('has-workspace', Boolean(workspace));
   document.body.classList.toggle('is-busy', isBusy);
@@ -289,6 +291,7 @@ function applyImmersiveColumnClasses(columns) {
     column.classList.toggle('peek-left', index === activeIndex - 1);
     column.classList.toggle('peek-right', index === activeIndex + 1);
     column.classList.toggle('hidden-depth', Math.abs(index - activeIndex) > 1);
+    column.dataset.depthPosition = index < activeIndex ? 'parent' : index > activeIndex ? 'child' : 'current';
   });
 }
 
@@ -517,6 +520,12 @@ function createColumn(id, title, subtitle) {
   section.dataset.columnId = id;
   const branch = workspace?.branches.find((item) => item.id === id);
   section.style.setProperty('--link-color', branch ? connectionColor(branch.depth - 1) : connectionColor(0));
+  section.addEventListener('click', (event) => {
+    if (!section.classList.contains('peek')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    showDepthMenu(event);
+  });
 
   const header = document.createElement('header');
   header.className = 'column-header';
@@ -536,6 +545,13 @@ function createColumn(id, title, subtitle) {
     meta.textContent = subtitle;
     header.append(heading, meta);
   }
+  const depthButton = button(id === 'root' ? 'D0' : `D${branch?.depth || 0}`, (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showDepthMenu(event);
+  }, 'Browse branch depth');
+  depthButton.className = 'depth-menu-button';
+  header.append(depthButton);
   section.append(header);
   const body = document.createElement('div');
   body.className = 'column-body';
@@ -959,6 +975,18 @@ function openBranchById(branchId) {
   render();
 }
 
+function activateColumn(columnId) {
+  if (columnId === 'root') {
+    pendingBranchBlockId = null;
+    pendingTextBranchSelection = null;
+    mobileActiveColumn = 'root';
+    workspace = { ...workspace, activeBranchId: null };
+    render();
+    return;
+  }
+  openBranchById(columnId);
+}
+
 function activateBranchPath(branchId) {
   const branch = workspace.branches.find((item) => item.id === branchId);
   if (!branch) return;
@@ -1334,12 +1362,95 @@ function hideSelectionMenu() {
   selectionMenuEl = null;
 }
 
+function showDepthMenu(event) {
+  if (!workspace) return;
+  hideContextMenu();
+  hideSelectionMenu();
+  hideDepthMenu();
+
+  const entries = depthMenuEntries();
+  if (!entries.length) return;
+  const rect = event.currentTarget?.getBoundingClientRect?.();
+  const left = Math.min(rect?.left ?? event.clientX, window.innerWidth - 280);
+  const top = Math.min((rect?.bottom ?? event.clientY) + 8, window.innerHeight - 280);
+  depthMenuEl = document.createElement('div');
+  depthMenuEl.className = 'depth-menu';
+  depthMenuEl.style.left = `${Math.max(8, left)}px`;
+  depthMenuEl.style.top = `${Math.max(8, top)}px`;
+
+  const title = document.createElement('p');
+  title.className = 'depth-menu-title';
+  title.textContent = 'Browse depth';
+  depthMenuEl.append(title);
+
+  const currentColumnId = mobileActiveColumn || workspace.activeBranchId || 'root';
+  entries.forEach((entry) => {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = entry.id === currentColumnId ? 'active' : '';
+    item.innerHTML = [
+      `<span class="depth-menu-depth">${entry.depthLabel}</span>`,
+      `<span class="depth-menu-copy"><strong>${escapeHtml(entry.title)}</strong><small>${escapeHtml(entry.subtitle)}</small></span>`,
+    ].join('');
+    item.addEventListener('click', () => {
+      hideDepthMenu();
+      activateColumn(entry.id);
+    });
+    depthMenuEl.append(item);
+  });
+
+  document.body.append(depthMenuEl);
+}
+
+function depthMenuEntries() {
+  const entries = [{
+    id: 'root',
+    depthLabel: 'D0',
+    title: workspaceTitle(),
+    subtitle: workspaceSummary(),
+  }];
+  const openBranches = workspace.branches
+    .filter((branch) => branch.isOpen)
+    .sort((a, b) => a.depth - b.depth || a.columnOrder - b.columnOrder);
+  openBranches.forEach((branch) => {
+    entries.push({
+      id: branch.id,
+      depthLabel: `D${branch.depth}`,
+      title: branch.title,
+      subtitle: branchSubtitle(branch),
+    });
+  });
+  return entries;
+}
+
+function branchSubtitle(branch) {
+  const source = workspace.blocks.find((block) => block.id === branch.sourceBlockId);
+  if (!source) return 'Branch';
+  const text = source.content.replace(/\s+/g, ' ').trim();
+  return text.length > 68 ? `${text.slice(0, 68)}...` : text;
+}
+
+function hideDepthMenu() {
+  depthMenuEl?.remove();
+  depthMenuEl = null;
+}
+
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function focusPendingColumn() {
   pendingColumnFocusId = null;
 }
 
 document.addEventListener('click', (event) => {
   if (contextMenuEl && !contextMenuEl.contains(event.target)) hideContextMenu();
+  if (depthMenuEl && !depthMenuEl.contains(event.target)) hideDepthMenu();
   if (selectionMenuEl?.contains(event.target)) return;
   const hasActiveSelection = Boolean(window.getSelection()?.toString().trim());
   if (selectionMenuEl && !selectionMenuEl.contains(event.target) && !hasActiveSelection) {
