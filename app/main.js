@@ -172,6 +172,16 @@ document.addEventListener('pointerup', (event) => {
   queueSelectionMenu(event);
 });
 
+function resetTextSelectionDrag() {
+  isPointerDownInBlockContent = false;
+  textSelectionPointer = null;
+  isDraggingTextSelection = false;
+  document.body.classList.remove('is-selecting-text');
+}
+
+document.addEventListener('pointercancel', resetTextSelectionDrag);
+window.addEventListener('blur', resetTextSelectionDrag);
+
 document.addEventListener('mouseup', (event) => {
   if (!workspace || selectionMenuEl?.contains(event.target)) return;
   queueSelectionMenu(event);
@@ -581,8 +591,38 @@ function createColumn(id, title, subtitle) {
   const hoverZone = document.createElement('div');
   hoverZone.className = 'composer-hover-zone';
   hoverZone.setAttribute('aria-hidden', 'true');
+  setupColumnComposerHover(section, hoverZone);
   section.append(hoverZone);
   return section;
+}
+
+function setupColumnComposerHover(column, hoverZone) {
+  let closeTimer = null;
+  const arm = () => {
+    window.clearTimeout(closeTimer);
+    if (!isDraggingTextSelection) document.body.classList.remove('is-selecting-text');
+    column.classList.add('composer-armed');
+  };
+  const disarmSoon = () => {
+    window.clearTimeout(closeTimer);
+    closeTimer = window.setTimeout(() => {
+      if (
+        column.matches(':focus-within')
+        || column.querySelector('.column-composer:hover')
+        || hoverZone.matches(':hover')
+      ) {
+        column.classList.add('composer-armed');
+        return;
+      }
+      column.classList.remove('composer-armed');
+    }, 180);
+  };
+
+  hoverZone.addEventListener('pointerenter', arm);
+  hoverZone.addEventListener('pointerleave', disarmSoon);
+  column.addEventListener('focusin', arm);
+  column.addEventListener('focusout', disarmSoon);
+  column.addEventListener('pointerleave', disarmSoon);
 }
 
 function renderBlock(block) {
@@ -1513,6 +1553,11 @@ async function askColumnQuestion(block, question) {
 function renderColumnComposer(placeholder, onSubmit) {
   const footer = document.createElement('footer');
   footer.className = 'column-composer';
+  ['pointerdown', 'pointerup', 'click'].forEach((eventName) => {
+    footer.addEventListener(eventName, (event) => {
+      event.stopPropagation();
+    });
+  });
   const textarea = document.createElement('textarea');
   textarea.rows = 2;
   textarea.placeholder = placeholder;

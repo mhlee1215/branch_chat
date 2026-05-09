@@ -1005,6 +1005,7 @@ body:not([data-view="chat"]) .view-panel {
 }
 
 .composer-hover-zone:hover + .column-composer,
+.column.composer-armed .column-composer,
 .column-composer:hover,
 .column:focus-within .column-composer,
 .column-composer:focus-within {
