@@ -55,6 +55,7 @@ let selectionMenuTimer = null;
 let textSelectionStartBlockId = null;
 let pendingBranchBlockId = null;
 let pendingTextBranchSelection = null;
+let lastRenderedActiveColumnId = null;
 
 startButton.addEventListener('click', async () => {
   const question = questionInput.value.trim();
@@ -263,6 +264,8 @@ function renderProviderStatus() {
 
 function renderWorkspace() {
   if (!workspace) {
+    lastRenderedActiveColumnId = null;
+    workspaceEl.dataset.transition = 'none';
     const empty = document.createElement('section');
     empty.className = 'empty-state';
     const title = document.createElement('h2');
@@ -285,6 +288,9 @@ function renderWorkspace() {
 function applyImmersiveColumnClasses(columns) {
   const activeColumnId = mobileActiveColumn || workspace.activeBranchId || 'root';
   const activeIndex = Math.max(0, columns.findIndex((column) => column.dataset.columnId === activeColumnId));
+  const previousColumnId = lastRenderedActiveColumnId;
+  const transition = depthTransition(previousColumnId, activeColumnId);
+  workspaceEl.dataset.transition = transition;
   columns.forEach((column, index) => {
     column.classList.toggle('active', index === activeIndex);
     column.classList.toggle('peek', index !== activeIndex);
@@ -293,6 +299,22 @@ function applyImmersiveColumnClasses(columns) {
     column.classList.toggle('hidden-depth', Math.abs(index - activeIndex) > 1);
     column.dataset.depthPosition = index < activeIndex ? 'parent' : index > activeIndex ? 'child' : 'current';
   });
+  lastRenderedActiveColumnId = activeColumnId;
+}
+
+function depthTransition(previousColumnId, nextColumnId) {
+  if (!previousColumnId || previousColumnId === nextColumnId) return 'none';
+  const previousDepth = columnDepth(previousColumnId);
+  const nextDepth = columnDepth(nextColumnId);
+  if (!Number.isInteger(previousDepth) || !Number.isInteger(nextDepth)) return 'switch';
+  if (nextDepth > previousDepth) return 'deeper';
+  if (nextDepth < previousDepth) return 'shallower';
+  return 'switch';
+}
+
+function columnDepth(columnId) {
+  if (columnId === 'root') return 0;
+  return workspace?.branches.find((branch) => branch.id === columnId)?.depth;
 }
 
 function renderViewPanel() {
