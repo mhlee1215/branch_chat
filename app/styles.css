@@ -14,6 +14,9 @@
   --shell-pad-x: 12px;
   --shell-pad-y: 12px;
   --workspace-height: calc(100dvh - 24px);
+  --sidebar-width: 232px;
+  --sidebar-compact-width: 66px;
+  --peek-width: clamp(42px, 5vw, 64px);
   font-size: 14px;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -66,7 +69,7 @@ button:disabled {
 
 .shell {
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 12px;
   width: 100%;
@@ -264,7 +267,7 @@ button:disabled {
 }
 
 .sidebar-collapsed .shell {
-  grid-template-columns: 66px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-compact-width) minmax(0, 1fr);
 }
 
 .sidebar-collapsed .app-sidebar {
@@ -461,14 +464,14 @@ h1 {
 }
 
 .has-workspace .shell {
-  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 12px;
   padding: var(--shell-pad-y) var(--shell-pad-x);
 }
 
 .sidebar-collapsed.has-workspace .shell {
-  grid-template-columns: 66px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-compact-width) minmax(0, 1fr);
 }
 
 .has-workspace .composer {
@@ -1264,8 +1267,9 @@ body:not([data-view="chat"]) .view-panel {
 
   .column.active {
     display: grid;
-    flex: 0 1 min(860px, calc(100vw - 430px));
-    min-width: min(720px, 100%);
+    flex: 1 1 min(860px, calc(100% - (var(--peek-width) * 2) - 32px));
+    min-width: 0;
+    max-width: min(860px, 100%);
   }
 
   .workspace[data-transition="deeper"] .column.active {
@@ -1282,7 +1286,7 @@ body:not([data-view="chat"]) .view-panel {
 
   .column.peek {
     display: grid;
-    flex: 0 0 clamp(54px, 6vw, 76px);
+    flex: 0 0 var(--peek-width);
     min-width: 0;
     opacity: 0.48;
     filter: saturate(0.72);
@@ -1417,6 +1421,80 @@ body:not([data-view="chat"]) .view-panel {
   to {
     opacity: 0.48;
     transform: translateX(-12px) scale(0.985);
+  }
+}
+
+@media (min-width: 760px) and (max-width: 1120px) {
+  :root {
+    --shell-pad-x: 14px;
+    --shell-pad-y: 14px;
+    --workspace-height: calc(100dvh - 28px);
+    --sidebar-width: 214px;
+    --peek-width: clamp(38px, 4.6vw, 52px);
+  }
+
+  .shell,
+  .has-workspace .shell {
+    gap: 10px;
+  }
+
+  .app-sidebar {
+    padding: 9px;
+  }
+
+  .sidebar-item,
+  .sidebar-section button {
+    min-height: 40px;
+    padding: 6px 8px;
+  }
+
+  .sidebar-primary {
+    min-height: 36px;
+  }
+
+  .workspace {
+    gap: 10px;
+  }
+
+  .column.active {
+    flex-basis: calc(100% - (var(--peek-width) * 2) - 20px);
+  }
+
+  .column-header {
+    min-height: 58px;
+    padding: 10px 14px;
+    padding-right: 52px;
+  }
+
+  .block-card,
+  .message {
+    padding: 12px 14px;
+  }
+}
+
+@media (min-width: 760px) and (max-width: 940px) {
+  :root {
+    --sidebar-width: var(--sidebar-compact-width);
+    --peek-width: clamp(34px, 4vw, 42px);
+  }
+
+  .app-sidebar {
+    align-items: center;
+  }
+
+  .sidebar-brand,
+  .sidebar-item small,
+  .sidebar-section,
+  .sidebar-primary,
+  .sidebar-footer {
+    display: none;
+  }
+
+  .sidebar-item {
+    justify-items: center;
+    width: 42px;
+    min-height: 38px;
+    padding: 0;
   }
 }
 
