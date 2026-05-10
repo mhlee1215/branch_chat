@@ -57,6 +57,7 @@ let pendingBranchBlockId = null;
 let pendingTextBranchSelection = null;
 let lastRenderedActiveColumnId = null;
 let activeColumnTransition = 'none';
+let columnTransitionAnimation = null;
 
 startButton.addEventListener('click', async () => {
   const question = questionInput.value.trim();
@@ -321,7 +322,6 @@ function applyImmersiveColumnClasses(columns) {
 function captureFoldSnapshot(nextColumnId) {
   const transition = depthTransition(lastRenderedActiveColumnId, nextColumnId);
   if (transition !== 'deeper') return null;
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return null;
   const column = workspaceEl.querySelector('.column.active');
   if (!column) return null;
   const rect = column.getBoundingClientRect();
@@ -343,61 +343,69 @@ function captureFoldSnapshot(nextColumnId) {
 
 function animateColumnFold(snapshot) {
   if (!snapshot || activeColumnTransition !== 'deeper') return;
-  const target = workspaceEl.querySelector('.column.peek-left');
-  if (!target) return;
-  const targetRect = target.getBoundingClientRect();
-  const hostRect = workspaceEl.getBoundingClientRect();
-  const ghost = document.createElement('div');
-  ghost.className = 'column-fold-ghost';
-  ghost.style.setProperty('--link-color', snapshot.color);
-  Object.assign(ghost.style, {
-    left: `${snapshot.left}px`,
-    top: `${snapshot.top}px`,
-    width: `${snapshot.width}px`,
-    height: `${snapshot.height}px`,
-  });
+  const source = workspaceEl.querySelector('.column.peek-left');
+  const target = workspaceEl.querySelector('.column.active');
+  if (!source || !target) return;
+  columnTransitionAnimation?.cancel();
 
-  const ghostHeader = document.createElement('div');
-  ghostHeader.className = 'column-fold-ghost-header';
-  const title = document.createElement('strong');
-  title.textContent = snapshot.title;
-  const subtitle = document.createElement('span');
-  subtitle.textContent = snapshot.subtitle;
-  ghostHeader.append(title, subtitle);
-  ghost.append(ghostHeader);
-  workspaceEl.classList.add('is-folding');
-  workspaceEl.append(ghost);
+  const sourceEndWidth = source.getBoundingClientRect().width;
+  const targetEndWidth = target.getBoundingClientRect().width;
+  const targetStartWidth = Math.max(sourceEndWidth, 42);
+  const sourceStartWidth = Math.max(snapshot.width, targetEndWidth);
+  const duration = 760;
+  const startedAt = performance.now();
+  let frameId = null;
 
-  const targetLeft = targetRect.left - hostRect.left;
-  const targetTop = targetRect.top - hostRect.top;
-  const animation = ghost.animate([
-    {
-      left: `${snapshot.left}px`,
-      top: `${snapshot.top}px`,
-      width: `${snapshot.width}px`,
-      height: `${snapshot.height}px`,
-      opacity: 0.96,
-      transform: 'perspective(900px) rotateY(0deg) scale(1)',
-      filter: 'saturate(1)',
-    },
-    {
-      left: `${targetLeft}px`,
-      top: `${targetTop}px`,
-      width: `${targetRect.width}px`,
-      height: `${targetRect.height}px`,
-      opacity: 0.2,
-      transform: 'perspective(900px) rotateY(-68deg) scaleY(0.985)',
-      filter: 'saturate(0.72)',
-    },
-  ], {
-    duration: 430,
-    easing: 'cubic-bezier(0.18, 0.86, 0.22, 1)',
-    fill: 'forwards',
-  });
-  animation.finished.finally(() => {
-    ghost.remove();
+  const easeOut = (value) => 1 - Math.pow(1 - value, 3);
+  const setWidth = (element, width) => {
+    element.style.flex = `0 0 ${width}px`;
+    element.style.maxWidth = `${width}px`;
+  };
+  const finish = () => {
+    window.cancelAnimationFrame(frameId);
+    source.classList.remove('folding-source');
+    target.classList.remove('opening-target');
+    source.style.flex = '';
+    source.style.maxWidth = '';
+    source.style.opacity = '';
+    source.style.transform = '';
+    target.style.flex = '';
+    target.style.maxWidth = '';
+    target.style.opacity = '';
+    target.style.transform = '';
     workspaceEl.classList.remove('is-folding');
-  });
+    columnTransitionAnimation = null;
+  };
+
+  workspaceEl.classList.add('is-folding');
+  source.classList.add('folding-source');
+  target.classList.add('opening-target');
+  setWidth(source, sourceStartWidth);
+  setWidth(target, targetStartWidth);
+  source.style.opacity = '0.96';
+  target.style.opacity = '0.28';
+
+  columnTransitionAnimation = { cancel: finish };
+
+  const tick = (now) => {
+    const progress = Math.min(1, (now - startedAt) / duration);
+    const eased = easeOut(progress);
+    const sourceWidth = sourceStartWidth + ((sourceEndWidth - sourceStartWidth) * eased);
+    const targetWidth = targetStartWidth + ((targetEndWidth - targetStartWidth) * eased);
+    setWidth(source, sourceWidth);
+    setWidth(target, targetWidth);
+    source.style.opacity = `${0.96 - (0.48 * eased)}`;
+    source.style.transform = `translateX(${12 * eased}px) perspective(900px) rotateY(${-10 * eased}deg) scaleY(${1 - (0.015 * eased)})`;
+    target.style.opacity = `${0.28 + (0.72 * eased)}`;
+    target.style.transform = `translateX(${22 * (1 - eased)}px) perspective(900px) rotateY(${8 * (1 - eased)}deg)`;
+    if (progress < 1) {
+      frameId = window.requestAnimationFrame(tick);
+      return;
+    }
+    finish();
+  };
+
+  frameId = window.requestAnimationFrame(tick);
 }
 
 function depthTransition(previousColumnId, nextColumnId) {
