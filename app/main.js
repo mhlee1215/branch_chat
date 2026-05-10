@@ -14,6 +14,7 @@ import { buildBranchContext } from '../src/domain/context-builder.js';
 import { createId } from '../src/utils/ids.js';
 import { fetchRuntimeConfig, requestAssistantResponse, saveRuntimeSettings } from '../src/domain/api-client.js';
 
+const APP_BUILD = '058';
 const questionInput = document.querySelector('#questionInput');
 const startButton = document.querySelector('#startButton');
 const synthesizeButton = document.querySelector('#synthesizeButton');
@@ -32,6 +33,7 @@ const branchRailEl = document.querySelector('#branchRail');
 const viewPanelEl = document.querySelector('#viewPanel');
 const summaryPanelEl = document.querySelector('#summaryPanel');
 const providerStatusEl = document.querySelector('#providerStatus');
+const buildBadgeEl = document.querySelector('#buildBadge');
 const promptChips = document.querySelectorAll('.prompt-chips button');
 
 let workspace = null;
@@ -58,6 +60,8 @@ let pendingTextBranchSelection = null;
 let lastRenderedActiveColumnId = null;
 let activeColumnTransition = 'none';
 let columnTransitionAnimation = null;
+
+showDevelopmentBuildBadge();
 
 startButton.addEventListener('click', async () => {
   const question = questionInput.value.trim();
@@ -274,6 +278,15 @@ function renderProviderStatus() {
     : 'provider-pill';
 }
 
+function showDevelopmentBuildBadge() {
+  if (!buildBadgeEl) return;
+  const isDevelopmentHost = ['localhost', '127.0.0.1', '::1', ''].includes(window.location.hostname);
+  if (!isDevelopmentHost) return;
+  buildBadgeEl.textContent = `Build ${APP_BUILD}`;
+  buildBadgeEl.hidden = false;
+  document.body.dataset.build = APP_BUILD;
+}
+
 function renderWorkspace() {
   if (!workspace) {
     lastRenderedActiveColumnId = null;
@@ -350,9 +363,9 @@ function animateColumnFold(snapshot) {
 
   const sourceEndWidth = source.getBoundingClientRect().width;
   const targetEndWidth = target.getBoundingClientRect().width;
-  const targetStartWidth = Math.max(sourceEndWidth, 42);
+  const targetStartWidth = Math.max(Math.min(sourceEndWidth, 30), 28);
   const sourceStartWidth = Math.max(snapshot.width, targetEndWidth);
-  const duration = 760;
+  const duration = 1400;
   const startedAt = performance.now();
   let frameId = null;
 

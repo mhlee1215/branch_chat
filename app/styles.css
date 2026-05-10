@@ -67,6 +67,30 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.build-badge {
+  position: fixed;
+  right: 10px;
+  bottom: 8px;
+  z-index: 50;
+  min-width: 66px;
+  border: 1px solid rgba(32, 32, 31, 0.18);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(23, 23, 23, 0.82);
+  color: #fff;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.68rem;
+  line-height: 1;
+  text-align: center;
+  letter-spacing: 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  pointer-events: none;
+}
+
+.build-badge[hidden] {
+  display: none;
+}
+
 .shell {
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
