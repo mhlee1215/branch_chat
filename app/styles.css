@@ -459,8 +459,10 @@ h1 {
 
 .workspace {
   display: none;
+  position: relative;
   gap: 12px;
   min-height: 0;
+  perspective: 1100px;
 }
 
 .has-workspace .shell {
@@ -1273,7 +1275,7 @@ body:not([data-view="chat"]) .view-panel {
   }
 
   .workspace[data-transition="deeper"] .column.active {
-    animation: activeColumnFromRight 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    animation: activeColumnUnfoldFromRight 380ms cubic-bezier(0.18, 0.86, 0.22, 1) both;
   }
 
   .workspace[data-transition="shallower"] .column.active {
@@ -1310,6 +1312,10 @@ body:not([data-view="chat"]) .view-panel {
   .workspace[data-transition="shallower"] .column.peek-left,
   .workspace[data-transition="switch"] .column.peek-left {
     animation: peekLeftSettle 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .workspace.is-folding[data-transition="deeper"] .column.peek-left {
+    opacity: 0.16;
   }
 
   .workspace[data-transition="deeper"] .column.peek-right,
@@ -1369,6 +1375,47 @@ body:not([data-view="chat"]) .view-panel {
   }
 }
 
+.column-fold-ghost {
+  position: absolute;
+  z-index: 8;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--link-color, #ff6a00);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--link-color, #ff6a00) 10%, white), rgba(255, 255, 255, 0.98)),
+    #fff;
+  box-shadow:
+    0 18px 54px rgba(48, 43, 36, 0.18),
+    inset 4px 0 0 color-mix(in srgb, var(--link-color, #ff6a00) 58%, transparent);
+  pointer-events: none;
+  transform-origin: left center;
+}
+
+.column-fold-ghost-header {
+  display: grid;
+  gap: 3px;
+  padding: 12px 16px;
+}
+
+.column-fold-ghost-header strong {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.column-fold-ghost-header span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @keyframes activeColumnFromRight {
   from {
     opacity: 0.3;
@@ -1377,6 +1424,21 @@ body:not([data-view="chat"]) .view-panel {
   to {
     opacity: 1;
     transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes activeColumnUnfoldFromRight {
+  0% {
+    opacity: 0.18;
+    transform: translateX(42px) perspective(900px) rotateY(12deg) scale(0.982);
+  }
+  55% {
+    opacity: 0.78;
+    transform: translateX(10px) perspective(900px) rotateY(3deg) scale(0.994);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) perspective(900px) rotateY(0deg) scale(1);
   }
 }
 

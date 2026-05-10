@@ -56,6 +56,7 @@ let textSelectionStartBlockId = null;
 let pendingBranchBlockId = null;
 let pendingTextBranchSelection = null;
 let lastRenderedActiveColumnId = null;
+let activeColumnTransition = 'none';
 
 startButton.addEventListener('click', async () => {
   const question = questionInput.value.trim();
@@ -275,6 +276,7 @@ function renderProviderStatus() {
 function renderWorkspace() {
   if (!workspace) {
     lastRenderedActiveColumnId = null;
+    activeColumnTransition = 'none';
     workspaceEl.dataset.transition = 'none';
     const empty = document.createElement('section');
     empty.className = 'empty-state';
@@ -291,8 +293,11 @@ function renderWorkspace() {
     renderRootColumn(),
     ...workspace.branches.filter((branch) => branch.isOpen).map(renderBranchColumn),
   ];
+  const activeColumnId = mobileActiveColumn || workspace.activeBranchId || 'root';
+  const foldSnapshot = captureFoldSnapshot(activeColumnId);
   applyImmersiveColumnClasses(columns);
   workspaceEl.replaceChildren(...columns);
+  animateColumnFold(foldSnapshot);
 }
 
 function applyImmersiveColumnClasses(columns) {
@@ -300,6 +305,7 @@ function applyImmersiveColumnClasses(columns) {
   const activeIndex = Math.max(0, columns.findIndex((column) => column.dataset.columnId === activeColumnId));
   const previousColumnId = lastRenderedActiveColumnId;
   const transition = depthTransition(previousColumnId, activeColumnId);
+  activeColumnTransition = transition;
   workspaceEl.dataset.transition = transition;
   columns.forEach((column, index) => {
     column.classList.toggle('active', index === activeIndex);
@@ -310,6 +316,88 @@ function applyImmersiveColumnClasses(columns) {
     column.dataset.depthPosition = index < activeIndex ? 'parent' : index > activeIndex ? 'child' : 'current';
   });
   lastRenderedActiveColumnId = activeColumnId;
+}
+
+function captureFoldSnapshot(nextColumnId) {
+  const transition = depthTransition(lastRenderedActiveColumnId, nextColumnId);
+  if (transition !== 'deeper') return null;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return null;
+  const column = workspaceEl.querySelector('.column.active');
+  if (!column) return null;
+  const rect = column.getBoundingClientRect();
+  const hostRect = workspaceEl.getBoundingClientRect();
+  const header = column.querySelector('.column-header');
+  const title = header?.querySelector('h2')?.textContent || '';
+  const subtitle = header?.querySelector('p, summary')?.textContent || '';
+  const styles = window.getComputedStyle(column);
+  return {
+    left: rect.left - hostRect.left,
+    top: rect.top - hostRect.top,
+    width: rect.width,
+    height: rect.height,
+    color: styles.getPropertyValue('--link-color') || '#ff6a00',
+    title,
+    subtitle,
+  };
+}
+
+function animateColumnFold(snapshot) {
+  if (!snapshot || activeColumnTransition !== 'deeper') return;
+  const target = workspaceEl.querySelector('.column.peek-left');
+  if (!target) return;
+  const targetRect = target.getBoundingClientRect();
+  const hostRect = workspaceEl.getBoundingClientRect();
+  const ghost = document.createElement('div');
+  ghost.className = 'column-fold-ghost';
+  ghost.style.setProperty('--link-color', snapshot.color);
+  Object.assign(ghost.style, {
+    left: `${snapshot.left}px`,
+    top: `${snapshot.top}px`,
+    width: `${snapshot.width}px`,
+    height: `${snapshot.height}px`,
+  });
+
+  const ghostHeader = document.createElement('div');
+  ghostHeader.className = 'column-fold-ghost-header';
+  const title = document.createElement('strong');
+  title.textContent = snapshot.title;
+  const subtitle = document.createElement('span');
+  subtitle.textContent = snapshot.subtitle;
+  ghostHeader.append(title, subtitle);
+  ghost.append(ghostHeader);
+  workspaceEl.classList.add('is-folding');
+  workspaceEl.append(ghost);
+
+  const targetLeft = targetRect.left - hostRect.left;
+  const targetTop = targetRect.top - hostRect.top;
+  const animation = ghost.animate([
+    {
+      left: `${snapshot.left}px`,
+      top: `${snapshot.top}px`,
+      width: `${snapshot.width}px`,
+      height: `${snapshot.height}px`,
+      opacity: 0.96,
+      transform: 'perspective(900px) rotateY(0deg) scale(1)',
+      filter: 'saturate(1)',
+    },
+    {
+      left: `${targetLeft}px`,
+      top: `${targetTop}px`,
+      width: `${targetRect.width}px`,
+      height: `${targetRect.height}px`,
+      opacity: 0.2,
+      transform: 'perspective(900px) rotateY(-68deg) scaleY(0.985)',
+      filter: 'saturate(0.72)',
+    },
+  ], {
+    duration: 430,
+    easing: 'cubic-bezier(0.18, 0.86, 0.22, 1)',
+    fill: 'forwards',
+  });
+  animation.finished.finally(() => {
+    ghost.remove();
+    workspaceEl.classList.remove('is-folding');
+  });
 }
 
 function depthTransition(previousColumnId, nextColumnId) {
