@@ -1,4 +1,4 @@
-const CACHE_NAME = 'branching-chat-gui-v58';
+const CACHE_NAME = 'branching-chat-gui-v59';
 const ASSETS = [
   '/',
   '/app/index.html',

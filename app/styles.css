@@ -1387,51 +1387,6 @@ body:not([data-view="chat"]) .view-panel {
     display: none;
   }
 
-  .workspace.is-folding[data-transition="deeper"] .column.peek-left,
-  .workspace.is-folding[data-transition="deeper"] .column.active {
-    animation: none !important;
-    transition: none !important;
-  }
-
-  .column.peek.folding-source {
-    opacity: 0.96;
-    filter: saturate(1);
-    cursor: default;
-  }
-
-  .column.peek.folding-source .column-header {
-    min-height: 66px;
-    padding: 12px 16px;
-    padding-right: 58px;
-    border-bottom: 1px solid var(--line);
-    writing-mode: horizontal-tb;
-    text-orientation: mixed;
-    box-shadow: inset 4px 0 0 color-mix(in srgb, var(--link-color, transparent) 65%, transparent);
-  }
-
-  .column.peek.folding-source .column-header h2 {
-    max-height: none;
-    font-size: 0.9rem;
-    line-height: 1.25;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .column.peek.folding-source .column-header p,
-  .column.peek.folding-source .initial-question {
-    display: block;
-  }
-
-  .column.peek.folding-source .column-body {
-    display: block;
-    overflow: hidden;
-  }
-
-  .column.peek.folding-source .block-card,
-  .column.peek.folding-source .message {
-    display: block;
-  }
-
   .column.hidden-depth {
     display: none !important;
   }
@@ -1439,6 +1394,75 @@ body:not([data-view="chat"]) .view-panel {
   .block-actions {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
+}
+
+.depth-transition-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 16px;
+  min-width: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 0 0, rgba(255, 106, 0, 0.07), transparent 32%),
+    #f4f3ef;
+  pointer-events: none;
+}
+
+.is-transitioning-depth > .column:not(.transition-column) {
+  visibility: hidden;
+}
+
+.transition-column {
+  display: grid !important;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform-origin: center center;
+  will-change: flex-basis, max-width, opacity, transform;
+}
+
+.transition-column .column-header {
+  min-height: 66px;
+  padding: 12px 16px;
+  padding-right: 58px;
+  border-bottom: 1px solid var(--line);
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--link-color, transparent) 65%, transparent);
+}
+
+.transition-column .column-header h2 {
+  max-height: none;
+  overflow: hidden;
+  font-size: 0.9rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transition-column .column-header p,
+.transition-column .initial-question {
+  display: block;
+}
+
+.transition-column .column-body {
+  display: block;
+  overflow: hidden;
+}
+
+.transition-column .block-card,
+.transition-column .message {
+  display: block;
+}
+
+.transition-column .column-composer,
+.transition-column .composer-hover-zone {
+  display: none;
 }
 
 @keyframes activeColumnFromLeft {
@@ -1514,6 +1538,10 @@ body:not([data-view="chat"]) .view-panel {
   }
 
   .workspace {
+    gap: 10px;
+  }
+
+  .depth-transition-overlay {
     gap: 10px;
   }
 

@@ -14,7 +14,7 @@ import { buildBranchContext } from '../src/domain/context-builder.js';
 import { createId } from '../src/utils/ids.js';
 import { fetchRuntimeConfig, requestAssistantResponse, saveRuntimeSettings } from '../src/domain/api-client.js';
 
-const APP_BUILD = '058';
+const APP_BUILD = '059';
 const questionInput = document.querySelector('#questionInput');
 const startButton = document.querySelector('#startButton');
 const synthesizeButton = document.querySelector('#synthesizeButton');
@@ -308,10 +308,10 @@ function renderWorkspace() {
     ...workspace.branches.filter((branch) => branch.isOpen).map(renderBranchColumn),
   ];
   const activeColumnId = mobileActiveColumn || workspace.activeBranchId || 'root';
-  const foldSnapshot = captureFoldSnapshot(activeColumnId);
+  const transitionSnapshot = captureDepthTransition(activeColumnId);
   applyImmersiveColumnClasses(columns);
   workspaceEl.replaceChildren(...columns);
-  animateColumnFold(foldSnapshot);
+  animateDepthTransition(transitionSnapshot);
 }
 
 function applyImmersiveColumnClasses(columns) {
@@ -332,41 +332,44 @@ function applyImmersiveColumnClasses(columns) {
   lastRenderedActiveColumnId = activeColumnId;
 }
 
-function captureFoldSnapshot(nextColumnId) {
+function captureDepthTransition(nextColumnId) {
   const transition = depthTransition(lastRenderedActiveColumnId, nextColumnId);
-  if (transition !== 'deeper') return null;
+  if (!['deeper', 'shallower'].includes(transition)) return null;
   const column = workspaceEl.querySelector('.column.active');
   if (!column) return null;
   const rect = column.getBoundingClientRect();
-  const hostRect = workspaceEl.getBoundingClientRect();
-  const header = column.querySelector('.column-header');
-  const title = header?.querySelector('h2')?.textContent || '';
-  const subtitle = header?.querySelector('p, summary')?.textContent || '';
-  const styles = window.getComputedStyle(column);
   return {
-    left: rect.left - hostRect.left,
-    top: rect.top - hostRect.top,
+    sourceClone: column.cloneNode(true),
+    transition,
     width: rect.width,
-    height: rect.height,
-    color: styles.getPropertyValue('--link-color') || '#ff6a00',
-    title,
-    subtitle,
   };
 }
 
-function animateColumnFold(snapshot) {
-  if (!snapshot || activeColumnTransition !== 'deeper') return;
-  const source = workspaceEl.querySelector('.column.peek-left');
+function animateDepthTransition(snapshot) {
+  if (!snapshot || snapshot.transition !== activeColumnTransition) return;
+  const sourcePeekSelector = snapshot.transition === 'deeper' ? '.column.peek-left' : '.column.peek-right';
+  const sourcePeek = workspaceEl.querySelector(sourcePeekSelector);
   const target = workspaceEl.querySelector('.column.active');
-  if (!source || !target) return;
+  if (!sourcePeek || !target) return;
   columnTransitionAnimation?.cancel();
 
-  const sourceEndWidth = source.getBoundingClientRect().width;
+  const source = snapshot.sourceClone;
+  const targetClone = target.cloneNode(true);
+  source.className = 'column transition-column transition-source';
+  targetClone.className = 'column transition-column transition-target';
+
+  const overlay = document.createElement('div');
+  overlay.className = `depth-transition-overlay ${snapshot.transition}`;
+  if (snapshot.transition === 'deeper') overlay.append(source, targetClone);
+  else overlay.append(targetClone, source);
+  workspaceEl.append(overlay);
+
+  const sourceEndWidth = sourcePeek.getBoundingClientRect().width;
   const targetEndWidth = target.getBoundingClientRect().width;
   const targetStartWidth = Math.max(Math.min(sourceEndWidth, 30), 28);
   const sourceStartWidth = Math.max(snapshot.width, targetEndWidth);
   const duration = 1400;
-  const startedAt = performance.now();
+  let startedAt = null;
   let frameId = null;
 
   const easeOut = (value) => 1 - Math.pow(1 - value, 3);
@@ -376,41 +379,31 @@ function animateColumnFold(snapshot) {
   };
   const finish = () => {
     window.cancelAnimationFrame(frameId);
-    source.classList.remove('folding-source');
-    target.classList.remove('opening-target');
-    source.style.flex = '';
-    source.style.maxWidth = '';
-    source.style.opacity = '';
-    source.style.transform = '';
-    target.style.flex = '';
-    target.style.maxWidth = '';
-    target.style.opacity = '';
-    target.style.transform = '';
-    workspaceEl.classList.remove('is-folding');
+    overlay.remove();
+    workspaceEl.classList.remove('is-transitioning-depth');
     columnTransitionAnimation = null;
   };
 
-  workspaceEl.classList.add('is-folding');
-  source.classList.add('folding-source');
-  target.classList.add('opening-target');
+  workspaceEl.classList.add('is-transitioning-depth');
   setWidth(source, sourceStartWidth);
-  setWidth(target, targetStartWidth);
+  setWidth(targetClone, targetStartWidth);
   source.style.opacity = '0.96';
-  target.style.opacity = '0.28';
+  targetClone.style.opacity = '0.24';
 
   columnTransitionAnimation = { cancel: finish };
 
   const tick = (now) => {
+    if (!startedAt) startedAt = now;
     const progress = Math.min(1, (now - startedAt) / duration);
     const eased = easeOut(progress);
     const sourceWidth = sourceStartWidth + ((sourceEndWidth - sourceStartWidth) * eased);
     const targetWidth = targetStartWidth + ((targetEndWidth - targetStartWidth) * eased);
     setWidth(source, sourceWidth);
-    setWidth(target, targetWidth);
+    setWidth(targetClone, targetWidth);
     source.style.opacity = `${0.96 - (0.48 * eased)}`;
-    source.style.transform = `translateX(${12 * eased}px) perspective(900px) rotateY(${-10 * eased}deg) scaleY(${1 - (0.015 * eased)})`;
-    target.style.opacity = `${0.28 + (0.72 * eased)}`;
-    target.style.transform = `translateX(${22 * (1 - eased)}px) perspective(900px) rotateY(${8 * (1 - eased)}deg)`;
+    source.style.transform = `perspective(900px) rotateY(${snapshot.transition === 'deeper' ? -10 * eased : 10 * eased}deg) scaleY(${1 - (0.015 * eased)})`;
+    targetClone.style.opacity = `${0.24 + (0.76 * eased)}`;
+    targetClone.style.transform = `perspective(900px) rotateY(${snapshot.transition === 'deeper' ? 8 * (1 - eased) : -8 * (1 - eased)}deg)`;
     if (progress < 1) {
       frameId = window.requestAnimationFrame(tick);
       return;
@@ -418,7 +411,9 @@ function animateColumnFold(snapshot) {
     finish();
   };
 
-  frameId = window.requestAnimationFrame(tick);
+  frameId = window.requestAnimationFrame(() => {
+    frameId = window.requestAnimationFrame(tick);
+  });
 }
 
 function depthTransition(previousColumnId, nextColumnId) {
