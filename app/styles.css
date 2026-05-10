@@ -1423,7 +1423,22 @@ body:not([data-view="chat"]) .view-panel {
   overflow: hidden;
   pointer-events: none;
   transform-origin: center center;
-  will-change: flex-basis, max-width, opacity, transform;
+  transition:
+    flex-basis 1700ms cubic-bezier(0.16, 0.92, 0.18, 1),
+    width 1700ms cubic-bezier(0.16, 0.92, 0.18, 1),
+    max-width 1700ms cubic-bezier(0.16, 0.92, 0.18, 1),
+    opacity 1200ms ease,
+    transform 1700ms cubic-bezier(0.16, 0.92, 0.18, 1),
+    filter 1200ms ease;
+  will-change: flex-basis, width, max-width, opacity, transform;
+}
+
+.depth-transition-overlay.run .transition-source {
+  filter: saturate(0.72);
+}
+
+.depth-transition-overlay.run .transition-target {
+  filter: saturate(1);
 }
 
 .transition-column .column-header {
@@ -1588,9 +1603,9 @@ body:not([data-view="chat"]) .view-panel {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .column,
-  .column.active,
-  .column.peek {
+  .column:not(.transition-column),
+  .column.active:not(.transition-column),
+  .column.peek:not(.transition-column) {
     animation: none !important;
     transition: none !important;
   }
