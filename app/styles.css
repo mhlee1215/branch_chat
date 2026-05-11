@@ -623,29 +623,46 @@ h1 {
   pointer-events: none;
 }
 
-.column.depth-animating {
-  display: grid !important;
-  animation: none !important;
+.workspace.is-transitioning-depth > .column {
+  visibility: hidden;
+}
+
+.depth-transition-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 16;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 16px;
+  min-width: 0;
   overflow: hidden;
-  transition:
-    flex-basis 980ms cubic-bezier(0.16, 0.92, 0.18, 1),
-    width 980ms cubic-bezier(0.16, 0.92, 0.18, 1),
-    max-width 980ms cubic-bezier(0.16, 0.92, 0.18, 1),
-    opacity 740ms ease,
-    transform 980ms cubic-bezier(0.16, 0.92, 0.18, 1),
-    filter 740ms ease !important;
+  background:
+    radial-gradient(circle at 0 0, rgba(255, 106, 0, 0.07), transparent 32%),
+    #f4f3ef;
+  pointer-events: none;
+}
+
+.transition-panel {
+  display: grid !important;
+  flex: 0 0 auto;
+  height: 100%;
+  min-width: 0;
+  max-width: none;
+  overflow: hidden;
+  transform-origin: center center;
   will-change: flex-basis, width, max-width, opacity, transform;
 }
 
-.column.depth-animation-source {
-  filter: saturate(0.78);
+.transition-source {
+  animation: depthSourceCollapse 1700ms cubic-bezier(0.16, 0.92, 0.18, 1) both;
 }
 
-.column.depth-animation-target {
-  filter: saturate(1);
+.transition-target {
+  animation: depthTargetExpand 1700ms cubic-bezier(0.16, 0.92, 0.18, 1) both;
 }
 
-.column.peek.depth-animation-source .column-header {
+.transition-panel .column-header {
   min-height: 66px;
   padding: 12px 16px;
   padding-right: 58px;
@@ -655,7 +672,7 @@ h1 {
   box-shadow: inset 4px 0 0 color-mix(in srgb, var(--link-color, transparent) 65%, transparent);
 }
 
-.column.peek.depth-animation-source .column-header h2 {
+.transition-panel .column-header h2 {
   max-height: none;
   overflow: hidden;
   font-size: 0.9rem;
@@ -664,28 +681,66 @@ h1 {
   white-space: nowrap;
 }
 
-.column.peek.depth-animation-source .depth-menu-button {
+.transition-panel .depth-menu-button {
   display: inline-grid;
 }
 
-.column.peek.depth-animation-source .column-header p,
-.column.peek.depth-animation-source .initial-question {
+.transition-panel .column-header p,
+.transition-panel .initial-question {
   display: block;
 }
 
-.column.peek.depth-animation-source .column-body {
+.transition-panel .column-body {
   display: block;
   overflow: hidden;
 }
 
-.column.peek.depth-animation-source .block-card,
-.column.peek.depth-animation-source .message {
+.transition-panel .block-card,
+.transition-panel .message {
   display: block;
 }
 
-.column.peek.depth-animation-source .column-composer,
-.column.peek.depth-animation-source .composer-hover-zone {
+.transition-panel .column-composer,
+.transition-panel .composer-hover-zone {
   display: none;
+}
+
+@keyframes depthSourceCollapse {
+  from {
+    flex-basis: var(--source-start-width);
+    width: var(--source-start-width);
+    max-width: var(--source-start-width);
+    opacity: 0.98;
+    filter: saturate(1);
+    transform: translateX(0) scale(1);
+  }
+  to {
+    flex-basis: var(--source-end-width);
+    width: var(--source-end-width);
+    max-width: var(--source-end-width);
+    opacity: 0.42;
+    filter: saturate(0.76);
+    transform: translateX(var(--source-shift)) scale(0.99);
+  }
+}
+
+@keyframes depthTargetExpand {
+  from {
+    flex-basis: var(--target-start-width);
+    width: var(--target-start-width);
+    max-width: var(--target-start-width);
+    opacity: 0.14;
+    filter: saturate(0.78);
+    transform: translateX(var(--target-shift)) scale(0.992);
+  }
+  to {
+    flex-basis: var(--target-end-width);
+    width: var(--target-end-width);
+    max-width: var(--target-end-width);
+    opacity: 1;
+    filter: saturate(1);
+    transform: translateX(0) scale(1);
+  }
 }
 
 .view-panel {
@@ -1584,9 +1639,9 @@ body:not([data-view="chat"]) .view-panel {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .column:not(.depth-animating),
-  .column.active:not(.depth-animating),
-  .column.peek:not(.depth-animating) {
+  .column:not(.transition-panel),
+  .column.active:not(.transition-panel),
+  .column.peek:not(.transition-panel) {
     animation: none !important;
     transition: none !important;
   }

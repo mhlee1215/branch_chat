@@ -14,7 +14,7 @@ import { buildBranchContext } from '../src/domain/context-builder.js';
 import { createId } from '../src/utils/ids.js';
 import { fetchRuntimeConfig, requestAssistantResponse, saveRuntimeSettings } from '../src/domain/api-client.js';
 
-const APP_BUILD = '062';
+const APP_BUILD = '063';
 const questionInput = document.querySelector('#questionInput');
 const startButton = document.querySelector('#startButton');
 const synthesizeButton = document.querySelector('#synthesizeButton');
@@ -339,6 +339,7 @@ function captureDepthTransition(nextColumnId) {
   if (!column) return null;
   const rect = column.getBoundingClientRect();
   return {
+    sourceClone: column.cloneNode(true),
     transition,
     width: rect.width,
   };
@@ -347,72 +348,47 @@ function captureDepthTransition(nextColumnId) {
 function animateDepthTransition(snapshot) {
   if (!snapshot || snapshot.transition !== activeColumnTransition) return;
   const sourcePeekSelector = snapshot.transition === 'deeper' ? '.column.peek-left' : '.column.peek-right';
-  const source = workspaceEl.querySelector(sourcePeekSelector);
+  const sourceSlot = workspaceEl.querySelector(sourcePeekSelector);
   const target = workspaceEl.querySelector('.column.active');
-  if (!source || !target) return;
+  if (!sourceSlot || !target) return;
   columnTransitionAnimation?.cancel();
 
-  const sourceEndWidth = source.getBoundingClientRect().width;
+  const sourceEndWidth = sourceSlot.getBoundingClientRect().width;
   const targetEndWidth = target.getBoundingClientRect().width;
-  const targetStartWidth = Math.max(Math.min(sourceEndWidth, 36), 32);
+  const targetStartWidth = Math.max(Math.min(sourceEndWidth, 72), 48);
   const sourceStartWidth = Math.max(snapshot.width, targetEndWidth);
-  const animatedColumns = [source, target];
-  let frameId = null;
-  let startFrameId = null;
+  const source = snapshot.sourceClone;
+  const targetClone = target.cloneNode(true);
+  const stage = document.createElement('div');
   let timerId = null;
+  const sourceShift = snapshot.transition === 'deeper' ? '-12px' : '12px';
+  const targetShift = snapshot.transition === 'deeper' ? '18px' : '-18px';
 
-  const setWidth = (element, width) => {
-    element.style.flexGrow = '0';
-    element.style.flexShrink = '0';
-    element.style.flexBasis = `${width}px`;
-    element.style.width = `${width}px`;
-    element.style.maxWidth = `${width}px`;
-  };
-  const resetColumn = (element) => {
-    element.classList.remove('depth-animating', 'depth-animation-source', 'depth-animation-target');
-    element.style.flexGrow = '';
-    element.style.flexShrink = '';
-    element.style.flexBasis = '';
-    element.style.width = '';
-    element.style.maxWidth = '';
-    element.style.opacity = '';
-    element.style.transform = '';
-  };
+  source.className = 'column transition-panel transition-source';
+  targetClone.className = 'column transition-panel transition-target';
+  stage.className = `depth-transition-stage ${snapshot.transition}`;
+  stage.style.setProperty('--source-start-width', `${sourceStartWidth}px`);
+  stage.style.setProperty('--source-end-width', `${sourceEndWidth}px`);
+  stage.style.setProperty('--target-start-width', `${targetStartWidth}px`);
+  stage.style.setProperty('--target-end-width', `${targetEndWidth}px`);
+  stage.style.setProperty('--source-shift', sourceShift);
+  stage.style.setProperty('--target-shift', targetShift);
+
+  if (snapshot.transition === 'deeper') stage.append(source, targetClone);
+  else stage.append(targetClone, source);
+
   const finish = () => {
-    window.cancelAnimationFrame(frameId);
-    window.cancelAnimationFrame(startFrameId);
     window.clearTimeout(timerId);
-    animatedColumns.forEach(resetColumn);
+    stage.remove();
     workspaceEl.classList.remove('is-transitioning-depth');
     columnTransitionAnimation = null;
   };
 
-  animatedColumns.forEach((column) => column.classList.add('depth-animating'));
-  source.classList.add('depth-animation-source');
-  target.classList.add('depth-animation-target');
   workspaceEl.classList.add('is-transitioning-depth');
-  setWidth(source, sourceStartWidth);
-  setWidth(target, targetStartWidth);
-  source.style.opacity = '0.96';
-  target.style.opacity = '0.18';
-  source.style.transform = 'scaleY(1)';
-  target.style.transform = `translateX(${snapshot.transition === 'deeper' ? 18 : -18}px) scale(0.992)`;
-
-  workspaceEl.offsetWidth;
+  workspaceEl.append(stage);
 
   columnTransitionAnimation = { cancel: finish };
-
-  frameId = window.requestAnimationFrame(() => {
-    startFrameId = window.requestAnimationFrame(() => {
-      setWidth(source, sourceEndWidth);
-      setWidth(target, targetEndWidth);
-      source.style.opacity = '0.46';
-      source.style.transform = `translateX(${snapshot.transition === 'deeper' ? -8 : 8}px) scale(0.99)`;
-      target.style.opacity = '1';
-      target.style.transform = 'translateX(0) scale(1)';
-      timerId = window.setTimeout(finish, 1280);
-    });
-  });
+  timerId = window.setTimeout(finish, 1850);
 }
 
 function depthTransition(previousColumnId, nextColumnId) {
