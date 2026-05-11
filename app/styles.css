@@ -645,6 +645,49 @@ h1 {
   filter: saturate(1);
 }
 
+.column.peek.depth-animation-source .column-header {
+  min-height: 66px;
+  padding: 12px 16px;
+  padding-right: 58px;
+  border-bottom: 1px solid var(--line);
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--link-color, transparent) 65%, transparent);
+}
+
+.column.peek.depth-animation-source .column-header h2 {
+  max-height: none;
+  overflow: hidden;
+  font-size: 0.9rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.column.peek.depth-animation-source .depth-menu-button {
+  display: inline-grid;
+}
+
+.column.peek.depth-animation-source .column-header p,
+.column.peek.depth-animation-source .initial-question {
+  display: block;
+}
+
+.column.peek.depth-animation-source .column-body {
+  display: block;
+  overflow: hidden;
+}
+
+.column.peek.depth-animation-source .block-card,
+.column.peek.depth-animation-source .message {
+  display: block;
+}
+
+.column.peek.depth-animation-source .column-composer,
+.column.peek.depth-animation-source .composer-hover-zone {
+  display: none;
+}
+
 .view-panel {
   display: none;
   align-self: stretch;

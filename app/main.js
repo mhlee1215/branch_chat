@@ -14,7 +14,7 @@ import { buildBranchContext } from '../src/domain/context-builder.js';
 import { createId } from '../src/utils/ids.js';
 import { fetchRuntimeConfig, requestAssistantResponse, saveRuntimeSettings } from '../src/domain/api-client.js';
 
-const APP_BUILD = '061';
+const APP_BUILD = '062';
 const questionInput = document.querySelector('#questionInput');
 const startButton = document.querySelector('#startButton');
 const synthesizeButton = document.querySelector('#synthesizeButton');
@@ -358,6 +358,7 @@ function animateDepthTransition(snapshot) {
   const sourceStartWidth = Math.max(snapshot.width, targetEndWidth);
   const animatedColumns = [source, target];
   let frameId = null;
+  let startFrameId = null;
   let timerId = null;
 
   const setWidth = (element, width) => {
@@ -379,6 +380,7 @@ function animateDepthTransition(snapshot) {
   };
   const finish = () => {
     window.cancelAnimationFrame(frameId);
+    window.cancelAnimationFrame(startFrameId);
     window.clearTimeout(timerId);
     animatedColumns.forEach(resetColumn);
     workspaceEl.classList.remove('is-transitioning-depth');
@@ -401,13 +403,15 @@ function animateDepthTransition(snapshot) {
   columnTransitionAnimation = { cancel: finish };
 
   frameId = window.requestAnimationFrame(() => {
-    setWidth(source, sourceEndWidth);
-    setWidth(target, targetEndWidth);
-    source.style.opacity = '0.46';
-    source.style.transform = `translateX(${snapshot.transition === 'deeper' ? -8 : 8}px) scale(0.99)`;
-    target.style.opacity = '1';
-    target.style.transform = 'translateX(0) scale(1)';
-    timerId = window.setTimeout(finish, 1180);
+    startFrameId = window.requestAnimationFrame(() => {
+      setWidth(source, sourceEndWidth);
+      setWidth(target, targetEndWidth);
+      source.style.opacity = '0.46';
+      source.style.transform = `translateX(${snapshot.transition === 'deeper' ? -8 : 8}px) scale(0.99)`;
+      target.style.opacity = '1';
+      target.style.transform = 'translateX(0) scale(1)';
+      timerId = window.setTimeout(finish, 1280);
+    });
   });
 }
 
