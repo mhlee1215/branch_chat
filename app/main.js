@@ -14,7 +14,7 @@ import { buildBranchContext } from '../src/domain/context-builder.js';
 import { createId } from '../src/utils/ids.js';
 import { fetchRuntimeConfig, requestAssistantResponse, saveRuntimeSettings } from '../src/domain/api-client.js';
 
-const APP_BUILD = '060';
+const APP_BUILD = '061';
 const questionInput = document.querySelector('#questionInput');
 const startButton = document.querySelector('#startButton');
 const synthesizeButton = document.querySelector('#synthesizeButton');
@@ -339,7 +339,6 @@ function captureDepthTransition(nextColumnId) {
   if (!column) return null;
   const rect = column.getBoundingClientRect();
   return {
-    sourceClone: column.cloneNode(true),
     transition,
     width: rect.width,
   };
@@ -348,26 +347,16 @@ function captureDepthTransition(nextColumnId) {
 function animateDepthTransition(snapshot) {
   if (!snapshot || snapshot.transition !== activeColumnTransition) return;
   const sourcePeekSelector = snapshot.transition === 'deeper' ? '.column.peek-left' : '.column.peek-right';
-  const sourcePeek = workspaceEl.querySelector(sourcePeekSelector);
+  const source = workspaceEl.querySelector(sourcePeekSelector);
   const target = workspaceEl.querySelector('.column.active');
-  if (!sourcePeek || !target) return;
+  if (!source || !target) return;
   columnTransitionAnimation?.cancel();
 
-  const source = snapshot.sourceClone;
-  const targetClone = target.cloneNode(true);
-  source.className = 'column transition-column transition-source';
-  targetClone.className = 'column transition-column transition-target';
-
-  const overlay = document.createElement('div');
-  overlay.className = `depth-transition-overlay ${snapshot.transition}`;
-  if (snapshot.transition === 'deeper') overlay.append(source, targetClone);
-  else overlay.append(targetClone, source);
-  workspaceEl.append(overlay);
-
-  const sourceEndWidth = sourcePeek.getBoundingClientRect().width;
+  const sourceEndWidth = source.getBoundingClientRect().width;
   const targetEndWidth = target.getBoundingClientRect().width;
   const targetStartWidth = Math.max(Math.min(sourceEndWidth, 36), 32);
   const sourceStartWidth = Math.max(snapshot.width, targetEndWidth);
+  const animatedColumns = [source, target];
   let frameId = null;
   let timerId = null;
 
@@ -378,35 +367,47 @@ function animateDepthTransition(snapshot) {
     element.style.width = `${width}px`;
     element.style.maxWidth = `${width}px`;
   };
+  const resetColumn = (element) => {
+    element.classList.remove('depth-animating', 'depth-animation-source', 'depth-animation-target');
+    element.style.flexGrow = '';
+    element.style.flexShrink = '';
+    element.style.flexBasis = '';
+    element.style.width = '';
+    element.style.maxWidth = '';
+    element.style.opacity = '';
+    element.style.transform = '';
+  };
   const finish = () => {
     window.cancelAnimationFrame(frameId);
     window.clearTimeout(timerId);
-    overlay.remove();
+    animatedColumns.forEach(resetColumn);
     workspaceEl.classList.remove('is-transitioning-depth');
     columnTransitionAnimation = null;
   };
 
+  animatedColumns.forEach((column) => column.classList.add('depth-animating'));
+  source.classList.add('depth-animation-source');
+  target.classList.add('depth-animation-target');
   workspaceEl.classList.add('is-transitioning-depth');
   setWidth(source, sourceStartWidth);
-  setWidth(targetClone, targetStartWidth);
+  setWidth(target, targetStartWidth);
   source.style.opacity = '0.96';
-  targetClone.style.opacity = '0.24';
+  target.style.opacity = '0.18';
   source.style.transform = 'scaleY(1)';
-  targetClone.style.transform = `perspective(900px) rotateY(${snapshot.transition === 'deeper' ? 8 : -8}deg)`;
+  target.style.transform = `translateX(${snapshot.transition === 'deeper' ? 18 : -18}px) scale(0.992)`;
 
-  overlay.offsetWidth;
+  workspaceEl.offsetWidth;
 
   columnTransitionAnimation = { cancel: finish };
 
   frameId = window.requestAnimationFrame(() => {
-    overlay.classList.add('run');
     setWidth(source, sourceEndWidth);
-    setWidth(targetClone, targetEndWidth);
-    source.style.opacity = '0.38';
-    source.style.transform = `perspective(900px) rotateY(${snapshot.transition === 'deeper' ? -8 : 8}deg) scaleY(0.985)`;
-    targetClone.style.opacity = '1';
-    targetClone.style.transform = 'perspective(900px) rotateY(0deg)';
-    timerId = window.setTimeout(finish, 1900);
+    setWidth(target, targetEndWidth);
+    source.style.opacity = '0.46';
+    source.style.transform = `translateX(${snapshot.transition === 'deeper' ? -8 : 8}px) scale(0.99)`;
+    target.style.opacity = '1';
+    target.style.transform = 'translateX(0) scale(1)';
+    timerId = window.setTimeout(finish, 1180);
   });
 }
 

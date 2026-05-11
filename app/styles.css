@@ -619,6 +619,32 @@ h1 {
   will-change: opacity, transform;
 }
 
+.workspace.is-transitioning-depth {
+  pointer-events: none;
+}
+
+.column.depth-animating {
+  display: grid !important;
+  animation: none !important;
+  overflow: hidden;
+  transition:
+    flex-basis 980ms cubic-bezier(0.16, 0.92, 0.18, 1),
+    width 980ms cubic-bezier(0.16, 0.92, 0.18, 1),
+    max-width 980ms cubic-bezier(0.16, 0.92, 0.18, 1),
+    opacity 740ms ease,
+    transform 980ms cubic-bezier(0.16, 0.92, 0.18, 1),
+    filter 740ms ease !important;
+  will-change: flex-basis, width, max-width, opacity, transform;
+}
+
+.column.depth-animation-source {
+  filter: saturate(0.78);
+}
+
+.column.depth-animation-target {
+  filter: saturate(1);
+}
+
 .view-panel {
   display: none;
   align-self: stretch;
@@ -1396,90 +1422,6 @@ body:not([data-view="chat"]) .view-panel {
   }
 }
 
-.depth-transition-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 12;
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  gap: 16px;
-  min-width: 0;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 0 0, rgba(255, 106, 0, 0.07), transparent 32%),
-    #f4f3ef;
-  pointer-events: none;
-}
-
-.is-transitioning-depth > .column:not(.transition-column) {
-  visibility: hidden;
-}
-
-.transition-column {
-  display: grid !important;
-  height: 100%;
-  min-width: 0;
-  overflow: hidden;
-  pointer-events: none;
-  transform-origin: center center;
-  transition:
-    flex-basis 1700ms cubic-bezier(0.16, 0.92, 0.18, 1),
-    width 1700ms cubic-bezier(0.16, 0.92, 0.18, 1),
-    max-width 1700ms cubic-bezier(0.16, 0.92, 0.18, 1),
-    opacity 1200ms ease,
-    transform 1700ms cubic-bezier(0.16, 0.92, 0.18, 1),
-    filter 1200ms ease;
-  will-change: flex-basis, width, max-width, opacity, transform;
-}
-
-.depth-transition-overlay.run .transition-source {
-  filter: saturate(0.72);
-}
-
-.depth-transition-overlay.run .transition-target {
-  filter: saturate(1);
-}
-
-.transition-column .column-header {
-  min-height: 66px;
-  padding: 12px 16px;
-  padding-right: 58px;
-  border-bottom: 1px solid var(--line);
-  writing-mode: horizontal-tb;
-  text-orientation: mixed;
-  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--link-color, transparent) 65%, transparent);
-}
-
-.transition-column .column-header h2 {
-  max-height: none;
-  overflow: hidden;
-  font-size: 0.9rem;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.transition-column .column-header p,
-.transition-column .initial-question {
-  display: block;
-}
-
-.transition-column .column-body {
-  display: block;
-  overflow: hidden;
-}
-
-.transition-column .block-card,
-.transition-column .message {
-  display: block;
-}
-
-.transition-column .column-composer,
-.transition-column .composer-hover-zone {
-  display: none;
-}
-
 @keyframes activeColumnFromLeft {
   from {
     opacity: 0.3;
@@ -1556,10 +1498,6 @@ body:not([data-view="chat"]) .view-panel {
     gap: 10px;
   }
 
-  .depth-transition-overlay {
-    gap: 10px;
-  }
-
   .column.active {
     flex-basis: calc(100% - (var(--peek-width) * 2) - 20px);
   }
@@ -1603,9 +1541,9 @@ body:not([data-view="chat"]) .view-panel {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .column:not(.transition-column),
-  .column.active:not(.transition-column),
-  .column.peek:not(.transition-column) {
+  .column:not(.depth-animating),
+  .column.active:not(.depth-animating),
+  .column.peek:not(.depth-animating) {
     animation: none !important;
     transition: none !important;
   }
