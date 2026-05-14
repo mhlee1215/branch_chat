@@ -14,7 +14,7 @@ import { buildBranchContext } from '../src/domain/context-builder.js';
 import { createId } from '../src/utils/ids.js';
 import { fetchRuntimeConfig, requestAssistantResponse, saveRuntimeSettings } from '../src/domain/api-client.js';
 
-const APP_BUILD = '063';
+const APP_BUILD = '078';
 const questionInput = document.querySelector('#questionInput');
 const startButton = document.querySelector('#startButton');
 const synthesizeButton = document.querySelector('#synthesizeButton');
@@ -57,6 +57,8 @@ let selectionMenuTimer = null;
 let textSelectionStartBlockId = null;
 let pendingBranchBlockId = null;
 let pendingTextBranchSelection = null;
+let pendingThreadPreview = null;
+let allowSelectionBranchFromDrag = false;
 let lastRenderedActiveColumnId = null;
 let activeColumnTransition = 'none';
 let columnTransitionAnimation = null;
@@ -147,11 +149,28 @@ promptChips.forEach((chip) => {
 });
 
 workspaceEl.addEventListener('pointerdown', (event) => {
-  if (!event.target.closest('.block-content')) return;
+  if (event.button !== 0 || event.target.closest('.branch-jump-button, .text-branch-chip, .column-composer, .thread-back-button, .depth-menu-button')) {
+    resetTextSelectionDrag();
+    return;
+  }
+  if (!event.target.closest('.block-content')) {
+    resetTextSelectionDrag();
+    return;
+  }
   isPointerDownInBlockContent = true;
   textSelectionStartBlockId = event.target.closest('.block-card[data-block-id]')?.dataset.blockId || null;
   hideSelectionMenu();
+  activeTextSelection = null;
+  allowSelectionBranchFromDrag = false;
+  window.getSelection()?.removeAllRanges();
   textSelectionPointer = { x: event.clientX, y: event.clientY };
+});
+
+workspaceEl.addEventListener('contextmenu', (event) => {
+  if (!event.target.closest('.block-card')) return;
+  event.preventDefault();
+  event.stopPropagation();
+  resetTextSelectionDrag();
 });
 
 workspaceEl.addEventListener('pointermove', (event) => {
@@ -174,14 +193,22 @@ document.addEventListener('pointerup', (event) => {
     window.setTimeout(() => {
       suppressNextBlockClick = false;
     }, 250);
+    const selectedText = cleanSelectedText(window.getSelection()?.toString());
+    if (selectedText) {
+      allowSelectionBranchFromDrag = true;
+      queueSelectionMenu(event);
+    } else {
+      allowSelectionBranchFromDrag = false;
+      textSelectionStartBlockId = null;
+    }
   }
-  queueSelectionMenu(event);
 });
 
 function resetTextSelectionDrag() {
   isPointerDownInBlockContent = false;
   textSelectionPointer = null;
   isDraggingTextSelection = false;
+  allowSelectionBranchFromDrag = false;
   document.body.classList.remove('is-selecting-text');
 }
 
@@ -303,15 +330,232 @@ function renderWorkspace() {
     return;
   }
 
-  const columns = [
-    renderRootColumn(),
-    ...workspace.branches.filter((branch) => branch.isOpen).map(renderBranchColumn),
+  renderThreadWorkspace();
+}
+
+function renderThreadWorkspace() {
+  columnTransitionAnimation?.cancel?.();
+  columnTransitionAnimation = null;
+  activeColumnTransition = 'none';
+  workspaceEl.dataset.transition = 'none';
+  workspaceEl.dataset.mode = 'threads';
+
+  const activeBranch = workspace.branches.find((branch) => branch.id === workspace.activeBranchId);
+  if (pendingThreadPreview) {
+    workspaceEl.dataset.threadDepth = 'split';
+    const parentPaneId = pendingThreadPreview.parentPaneId || 'root';
+    workspaceEl.replaceChildren(
+      renderThreadPane(parentPaneId, 'parent'),
+      renderPendingThreadPane(pendingThreadPreview),
+    );
+    lastRenderedActiveColumnId = 'pending-thread';
+    return;
+  }
+
+  workspaceEl.dataset.threadDepth = activeBranch ? 'split' : 'single';
+  const parentPaneId = activeBranch?.parentBranchId || 'root';
+  const panes = [renderThreadPane(parentPaneId, activeBranch ? 'parent' : 'primary')];
+  if (activeBranch) panes.push(renderThreadPane(activeBranch.id, 'active'));
+  lastRenderedActiveColumnId = activeBranch?.id || 'root';
+  workspaceEl.replaceChildren(...panes);
+}
+
+function renderThreadPane(paneId, role) {
+  const isRoot = paneId === 'root';
+  const branch = isRoot ? null : workspace.branches.find((item) => item.id === paneId);
+  const pane = document.createElement('section');
+  pane.className = `thread-pane ${role}`;
+  pane.dataset.columnId = paneId;
+  pane.dataset.threadRole = role;
+  pane.style.setProperty('--link-color', branch ? connectionColor(branch.depth - 1) : connectionColor(0));
+
+  const header = document.createElement('header');
+  header.className = 'thread-header';
+  if (!isRoot && branch) {
+    header.append(renderThreadDepthNav(branch));
+  }
+  const copy = document.createElement('div');
+  copy.className = 'thread-header-copy';
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 'thread-eyebrow';
+  eyebrow.textContent = isRoot ? 'Main chat' : `Thread D${branch?.depth || 0}`;
+  const title = document.createElement('h2');
+  title.textContent = isRoot ? workspaceTitle() : branch?.title || 'Thread';
+  const subtitle = document.createElement('p');
+  subtitle.textContent = isRoot ? workspaceSummary() : branchSubtitle(branch);
+  copy.append(eyebrow, title, subtitle);
+  header.append(copy);
+
+  const controls = document.createElement('div');
+  controls.className = 'thread-header-actions';
+  const browse = button(isRoot ? 'D0' : `D${branch?.depth || 0}`, (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    showDepthMenu(event);
+  }, 'Browse thread depth');
+  browse.className = 'depth-menu-button';
+  controls.append(browse);
+  header.append(controls);
+
+  const timeline = document.createElement('div');
+  timeline.className = 'thread-timeline column-body';
+  if (isRoot) {
+    timeline.append(renderTimelineUserMessage(workspace.originalQuestion, 'Original question'));
+    timeline.append(renderTimelineAssistantBlocks(
+      workspace.blocks.filter((block) => block.messageId === workspace.rootMessageId),
+      'Assistant',
+    ));
+  } else {
+    workspace.messages
+      .filter((message) => message.branchId === branch?.id)
+      .forEach((message) => {
+        if (message.role === 'user') {
+          timeline.append(renderTimelineUserMessage(message.content, 'Question'));
+          return;
+        }
+        if (message.role === 'assistant') {
+          timeline.append(renderTimelineAssistantBlocks(
+            workspace.blocks.filter((block) => block.messageId === message.id),
+            'Assistant',
+          ));
+          return;
+        }
+        timeline.append(renderTimelinePlainMessage(message));
+      });
+  }
+
+  pane.append(header, timeline);
+  const hoverZone = document.createElement('div');
+  hoverZone.className = 'composer-hover-zone';
+  hoverZone.setAttribute('aria-hidden', 'true');
+  setupColumnComposerHover(pane, hoverZone);
+  pane.append(hoverZone);
+  if (!appendPendingBranchComposer(pane)) {
+    const fallbackBlock = firstBlockForPane(paneId);
+    pane.append(renderColumnComposer(isRoot ? 'Message this chat' : 'Reply in this thread', (question) => askColumnQuestion(fallbackBlock, question)));
+  }
+  return pane;
+}
+
+function renderThreadDepthNav(branch) {
+  const nav = document.createElement('nav');
+  nav.className = 'thread-depth-nav';
+  nav.setAttribute('aria-label', 'Thread depth navigation');
+
+  const back = button('', () => activateColumn(branch.parentBranchId || 'root'), 'Open parent thread');
+  back.className = 'thread-back-button';
+  back.setAttribute('aria-label', 'Open parent thread');
+
+  const dots = document.createElement('div');
+  dots.className = 'thread-depth-dots';
+  threadDepthEntries(branch).forEach((entry) => {
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = entry.id === branch.id ? 'active' : '';
+    dot.title = entry.label;
+    dot.setAttribute('aria-label', entry.label);
+    dot.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      activateColumn(entry.id);
+    });
+    dots.append(dot);
+  });
+
+  nav.append(back, dots);
+  return nav;
+}
+
+function threadDepthEntries(branch) {
+  const branches = [];
+  let current = branch;
+  while (current) {
+    branches.unshift(current);
+    current = workspace.branches.find((item) => item.id === current.parentBranchId);
+  }
+  return [
+    { id: 'root', label: 'Depth 0' },
+    ...branches.map((item) => ({ id: item.id, label: `Depth ${item.depth}` })),
   ];
-  const activeColumnId = mobileActiveColumn || workspace.activeBranchId || 'root';
-  const transitionSnapshot = captureDepthTransition(activeColumnId);
-  applyImmersiveColumnClasses(columns);
-  workspaceEl.replaceChildren(...columns);
-  animateDepthTransition(transitionSnapshot);
+}
+
+function renderTimelineUserMessage(content, label) {
+  const item = document.createElement('article');
+  item.className = 'timeline-message user';
+  const meta = document.createElement('p');
+  meta.className = 'timeline-meta';
+  meta.textContent = label;
+  const bubble = document.createElement('div');
+  bubble.className = 'timeline-bubble';
+  bubble.textContent = content;
+  item.append(meta, bubble);
+  return item;
+}
+
+function renderTimelinePlainMessage(message) {
+  const item = document.createElement('article');
+  item.className = `timeline-message ${message.role}`;
+  const meta = document.createElement('p');
+  meta.className = 'timeline-meta';
+  meta.textContent = message.role;
+  const bubble = document.createElement('div');
+  bubble.className = 'timeline-bubble';
+  bubble.textContent = message.content;
+  item.append(meta, bubble);
+  return item;
+}
+
+function renderTimelineAssistantBlocks(blocks, label) {
+  const item = document.createElement('article');
+  item.className = 'timeline-message assistant';
+  const meta = document.createElement('p');
+  meta.className = 'timeline-meta';
+  meta.textContent = label;
+  const bubble = document.createElement('div');
+  bubble.className = 'timeline-bubble assistant-blocks';
+  if (blocks.length) bubble.append(...blocks.map((block) => renderBlock(block)));
+  else bubble.textContent = 'No assistant blocks yet.';
+  item.append(meta, bubble);
+  return item;
+}
+
+function renderPendingThreadPane(preview) {
+  const pane = document.createElement('section');
+  pane.className = 'thread-pane active pending-thread';
+  pane.dataset.columnId = 'pending-thread';
+  pane.dataset.threadRole = 'active';
+  pane.style.setProperty('--link-color', connectionColor(preview.depth - 1));
+
+  const header = document.createElement('header');
+  header.className = 'thread-header';
+  const copy = document.createElement('div');
+  copy.className = 'thread-header-copy';
+  const eyebrow = document.createElement('p');
+  eyebrow.className = 'thread-eyebrow';
+  eyebrow.textContent = `Thread D${preview.depth}`;
+  const title = document.createElement('h2');
+  title.textContent = preview.title || 'New thread';
+  const subtitle = document.createElement('p');
+  subtitle.textContent = preview.sourceSummary || 'Preparing branch answer';
+  copy.append(eyebrow, title, subtitle);
+  header.append(copy);
+
+  const timeline = document.createElement('div');
+  timeline.className = 'thread-timeline column-body';
+  timeline.append(
+    renderTimelineUserMessage(preview.question, 'Question'),
+    renderTimelinePlainMessage({ role: 'assistant pending', content: 'Thinking...' }),
+  );
+  pane.append(header, timeline);
+  return pane;
+}
+
+function firstBlockForPane(paneId) {
+  if (paneId === 'root') {
+    return workspace.blocks.find((block) => block.messageId === workspace.rootMessageId);
+  }
+  const assistantMessage = workspace.messages.find((message) => message.branchId === paneId && message.role === 'assistant');
+  return workspace.blocks.find((block) => block.messageId === assistantMessage?.id);
 }
 
 function applyImmersiveColumnClasses(columns) {
@@ -350,10 +594,16 @@ function animateDepthTransition(snapshot) {
   const sourcePeekSelector = snapshot.transition === 'deeper' ? '.column.peek-left' : '.column.peek-right';
   const sourceSlot = workspaceEl.querySelector(sourcePeekSelector);
   const target = workspaceEl.querySelector('.column.active');
-  if (!sourceSlot || !target) return;
+  if (!target) return;
   columnTransitionAnimation?.cancel();
 
-  const sourceEndWidth = sourceSlot.getBoundingClientRect().width;
+  // For 'shallower' transitions the closing branch is removed from the DOM by
+  // activateBranchPath (isOpen → false), so sourceSlot may not exist.
+  // Fall back to any remaining peek column's width to get the peek dimension.
+  const fallbackPeek = workspaceEl.querySelector('.column.peek-left, .column.peek-right');
+  const sourceEndWidth = sourceSlot
+    ? sourceSlot.getBoundingClientRect().width
+    : (fallbackPeek?.getBoundingClientRect().width ?? 56);
   const targetEndWidth = target.getBoundingClientRect().width;
   const targetStartWidth = Math.max(Math.min(sourceEndWidth, 72), 48);
   const sourceStartWidth = Math.max(snapshot.width, targetEndWidth);
@@ -377,18 +627,36 @@ function animateDepthTransition(snapshot) {
   if (snapshot.transition === 'deeper') stage.append(source, targetClone);
   else stage.append(targetClone, source);
 
+  let finished = false;
   const finish = () => {
+    if (finished) return;
+    finished = true;
     window.clearTimeout(timerId);
+    source.removeEventListener('animationend', onAnimationEnd);
+    targetClone.removeEventListener('animationend', onAnimationEnd);
     stage.remove();
     workspaceEl.classList.remove('is-transitioning-depth');
     columnTransitionAnimation = null;
   };
 
+  let animationsEnded = 0;
+  const onAnimationEnd = (event) => {
+    // Ignore events that bubbled up from child elements — only count the panel's own animation.
+    // Also guard against unrelated animationName values from re-used class names.
+    if (event.target !== event.currentTarget) return;
+    animationsEnded++;
+    if (animationsEnded >= 2) finish();
+  };
+
   workspaceEl.classList.add('is-transitioning-depth');
   workspaceEl.append(stage);
 
+  source.addEventListener('animationend', onAnimationEnd);
+  targetClone.addEventListener('animationend', onAnimationEnd);
+
+  // Fallback timeout: CSS duration(1700ms) + 200ms buffer
   columnTransitionAnimation = { cancel: finish };
-  timerId = window.setTimeout(finish, 1850);
+  timerId = window.setTimeout(finish, 1900);
 }
 
 function depthTransition(previousColumnId, nextColumnId) {
@@ -498,7 +766,7 @@ function viewGrid(items) {
 
 function captureScrollPositions() {
   if (!workspaceEl) return;
-  savedScrollPositions = new Map([...workspaceEl.querySelectorAll('.column')].map((column) => {
+  savedScrollPositions = new Map([...workspaceEl.querySelectorAll('.column, .thread-pane')].map((column) => {
     const key = column.dataset.columnId;
     const body = column.querySelector('.column-body');
     return [key, body?.scrollTop || 0];
@@ -523,7 +791,7 @@ function restoreScrollPositions() {
 }
 
 function lockColumnScrollFromEvent(event) {
-  const column = event.currentTarget?.closest?.('.column');
+  const column = event?.currentTarget?.closest?.('.column, .thread-pane');
   const body = column?.querySelector('.column-body');
   if (!column?.dataset.columnId || !body) return;
   lockedScrollPositions.set(column.dataset.columnId, body.scrollTop);
@@ -721,37 +989,37 @@ function renderBlock(block) {
   title.textContent = block.title;
   header.append(title);
 
-  const branchStats = branchStatsForBlock(block);
-  if (branchStats.count > 0) {
-    const indicator = document.createElement('span');
-    indicator.className = 'branch-indicator';
-    indicator.setAttribute(
-      'aria-label',
-      `${branchStats.count} direct branch${branchStats.count > 1 ? 'es' : ''}, deepest depth ${branchStats.maxDepth}`,
-    );
-    indicator.title = `${branchStats.count} direct branch${branchStats.count > 1 ? 'es' : ''}; deepest depth ${branchStats.maxDepth}`;
-    indicator.innerHTML = [
-      `<span class="branch-metric"><span aria-hidden="true">↳</span>${branchStats.count}</span>`,
-      `<span class="branch-metric depth">D${branchStats.maxDepth}</span>`,
-    ].join('');
-    header.append(indicator);
-  }
-
   const content = renderRichText(block.content, selectionMarkersForBlock(block));
   content.classList.add('block-content');
 
-  const actions = document.createElement('div');
-  actions.className = 'block-actions';
-  actions.append(
-    button('Ask', () => askBlockQuestion(block), 'Ask about this block'),
-    button('Split', () => splitBlockAtPrompt(block), 'Split selected text'),
-    button('Merge next', () => mergeWithNext(block), 'Merge with next block'),
-    button('Rename', () => renameBlockAtPrompt(block), 'Rename block'),
-    button(block.includeInSummary ? 'Included' : 'Excluded', () => toggleSummary(block), 'Toggle synthesis inclusion'),
-  );
+  const footer = document.createElement('footer');
+  footer.className = 'block-footer';
+  const branchButton = renderBranchJumpButton(block);
+  if (branchButton) footer.append(branchButton);
 
-  card.append(header, content, actions);
+  card.append(header, content, footer);
   return card;
+}
+
+function askBlockQuestion(block, event) {
+  openBranchComposer(block, event);
+}
+
+function renderBranchJumpButton(block) {
+  const stats = branchStatsForBlock(block);
+  const childBranch = branchForBlock(block);
+  if (!childBranch || stats.count <= 0) return null;
+  const title = `${stats.count} thread${stats.count > 1 ? 's' : ''}, deepest depth ${stats.maxDepth}`;
+  const branchButton = button('', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    lockColumnScrollFromEvent(event);
+    openBranchById(childBranch.id);
+  }, title);
+  branchButton.setAttribute('aria-label', title);
+  branchButton.className = 'branch-jump-button has-branches';
+  branchButton.innerHTML = '<span class="branch-icon" aria-hidden="true"></span>';
+  return branchButton;
 }
 
 function renderRichText(markdown, markers = []) {
@@ -881,13 +1149,6 @@ function renderTextBranchMarker(text, marker) {
   wrap.className = marker.active ? 'text-branch-marker active' : 'text-branch-marker';
   if (marker.pending) wrap.classList.add('pending');
   wrap.style.setProperty('--link-color', marker.color || connectionColor(0));
-  wrap.addEventListener('click', (event) => {
-    if (marker.pending) return;
-    if (window.getSelection()?.toString().trim()) return;
-    event.preventDefault();
-    event.stopPropagation();
-    openTextBranchMarker(marker, event);
-  });
   appendInlineRichText(wrap, text, []);
   if (marker.pending) return wrap;
 
@@ -1080,26 +1341,31 @@ function blockConnectionColor(block) {
 }
 
 function handleBlockClick(event, block) {
+  event.preventDefault();
+  event.stopPropagation();
   if (suppressNextBlockClick) {
     suppressNextBlockClick = false;
-    event.preventDefault();
-    event.stopPropagation();
     return;
   }
   if (window.getSelection()?.toString().trim() || isDraggingTextSelection) {
-    event.preventDefault();
-    event.stopPropagation();
     return;
   }
-  lockColumnScrollFromEvent(event);
   if (event.shiftKey) {
     if (selectedBlockIds.has(block.id)) selectedBlockIds.delete(block.id);
     else selectedBlockIds.add(block.id);
-    render();
+    updateBlockSelectionDom();
     return;
   }
   selectedBlockIds = new Set([block.id]);
-  if (!selectBlock(block)) render();
+  updateBlockSelectionDom();
+}
+
+function updateBlockSelectionDom() {
+  workspaceEl.querySelectorAll('.block-card[data-block-id]').forEach((card) => {
+    const block = workspace.blocks.find((item) => item.id === card.dataset.blockId);
+    if (!block) return;
+    card.classList.toggle('selected', isBlockSelected(block));
+  });
 }
 
 function selectBlock(block) {
@@ -1121,7 +1387,11 @@ function activateColumn(columnId) {
     pendingBranchBlockId = null;
     pendingTextBranchSelection = null;
     mobileActiveColumn = 'root';
-    workspace = { ...workspace, activeBranchId: null };
+    workspace = {
+      ...workspace,
+      activeBranchId: null,
+      branches: workspace.branches.map((branch) => ({ ...branch, isOpen: false })),
+    };
     render();
     return;
   }
@@ -1163,35 +1433,21 @@ function getBranchPathIds(branchId) {
 
 function showBlockContextMenu(event, block) {
   event.preventDefault();
-  if (!selectedBlockIds.has(block.id)) selectedBlockIds = new Set([block.id]);
+  event.stopPropagation();
+  resetTextSelectionDrag();
   hideContextMenu();
+  hideSelectionMenu();
+  window.getSelection()?.removeAllRanges();
+  selectedBlockIds = new Set([block.id]);
+  updateBlockSelectionDom();
 
   contextMenuEl = document.createElement('div');
   contextMenuEl.className = 'context-menu';
-  contextMenuEl.style.left = `${event.clientX}px`;
-  contextMenuEl.style.top = `${event.clientY}px`;
-
-  if (selectedBlockIds.size > 1) {
-    contextMenuEl.append(menuButton(`Merge ${selectedBlockIds.size} blocks`, () => {
-      try {
-        workspace = mergeWorkspaceBlocks(workspace, [...selectedBlockIds]);
-        selectedBlockIds = new Set();
-        render();
-      } catch (error) {
-        alert(error.message);
-      }
-    }));
-  } else {
-    contextMenuEl.append(menuButton('Split block', () => {
-      splitSelectedTextOrBlock(block);
-      selectedBlockIds = new Set();
-      render();
-    }));
-    contextMenuEl.append(menuButton('Make a branch', () => {
-      openBranchComposer(block, event);
-    }));
-  }
-
+  contextMenuEl.style.left = `${Math.min(event.clientX, window.innerWidth - 190)}px`;
+  contextMenuEl.style.top = `${Math.min(event.clientY, window.innerHeight - 80)}px`;
+  contextMenuEl.append(menuButton('Make a branch', () => {
+    openBranchComposer(block, event);
+  }));
   document.body.append(contextMenuEl);
 }
 
@@ -1222,18 +1478,36 @@ function openBranchComposer(block, event) {
 
 function queueSelectionMenu(event) {
   if (!workspace || selectionMenuEl?.contains(event?.target)) return;
+  if (event && event.button !== 0) return;
+  if (!allowSelectionBranchFromDrag) return;
+  const selectedText = cleanSelectedText(window.getSelection()?.toString());
+  if (!selectedText) {
+    allowSelectionBranchFromDrag = false;
+    textSelectionStartBlockId = null;
+    return;
+  }
   window.clearTimeout(selectionMenuTimer);
   selectionMenuTimer = window.setTimeout(() => showSelectionBranchMenu(), 30);
 }
 
 function showSelectionBranchMenu() {
+  allowSelectionBranchFromDrag = false;
   const selection = window.getSelection();
   const selectedText = cleanSelectedText(selection?.toString());
-  if (!selectedText || !selection.rangeCount) return;
+  if (!selectedText || !selection.rangeCount) {
+    textSelectionStartBlockId = null;
+    return;
+  }
   const range = selection.getRangeAt(0);
   const selectedRanges = collectSelectedBlockRanges(selection, selectedText);
-  if (!selectedRanges.length) return;
-  if (selectedRanges.length > 1) return;
+  if (!selectedRanges.length) {
+    textSelectionStartBlockId = null;
+    return;
+  }
+  if (selectedRanges.length > 1) {
+    textSelectionStartBlockId = null;
+    return;
+  }
   const sourceRange = selectedRanges.length === 1
     ? { start: selectedRanges[0].start, end: selectedRanges[0].end }
     : null;
@@ -1250,11 +1524,10 @@ function showSelectionBranchMenu() {
     mode: 'branch',
   };
   hideSelectionMenu();
-
   selectionMenuEl = document.createElement('div');
   selectionMenuEl.className = 'selection-menu';
-  selectionMenuEl.style.left = `${Math.min(menuRect.left, window.innerWidth - 260)}px`;
-  selectionMenuEl.style.top = `${Math.max(menuRect.bottom + 8, 8)}px`;
+  selectionMenuEl.style.left = `${Math.min(menuRect.left, window.innerWidth - 220)}px`;
+  selectionMenuEl.style.top = `${Math.min(menuRect.bottom + 8, window.innerHeight - 54)}px`;
   const branchButton = menuButton('Make a branch', () => {});
   branchButton.addEventListener('pointerdown', (pointerEvent) => {
     pointerEvent.preventDefault();
@@ -1436,32 +1709,47 @@ async function askTextSelectionQuestion(selection, question) {
   if (!selection || !question?.trim() || isBusy) return;
   const parentBlock = workspace.blocks.find((block) => block.id === selection.blockId);
   if (!parentBlock) return;
+  const trimmedQuestion = question.trim();
+  const parentBranchId = parentBranchIdForBlock(selection.blockId);
+  const parentBranch = workspace.branches.find((branch) => branch.id === parentBranchId);
+  pendingThreadPreview = {
+    parentPaneId: columnIdForBlock(parentBlock),
+    title: shortText(selection.text, parentBlock.title),
+    sourceSummary: branchSubtitleForContent(selection.text),
+    question: trimmedQuestion,
+    depth: parentBranch ? parentBranch.depth + 1 : 1,
+  };
   setBusy(true);
+  let pendingResult = null;
   try {
-    const context = buildTextSelectionBranchContext(selection, question.trim());
+    const context = buildTextSelectionBranchContext(selection, trimmedQuestion);
     const payload = await requestAssistantResponse(context, { messageId: createId('message') });
-    const result = appendSelectionBranchAnswer(
+    pendingResult = appendSelectionBranchAnswer(
       workspace,
       selection.blockId,
       selection.text,
-      question.trim(),
+      trimmedQuestion,
       payload.message.content,
       {
-        parentBranchId: parentBranchIdForBlock(selection.blockId),
+        parentBranchId,
         sourceRange: { start: selection.start, end: selection.end },
       },
     );
-    workspace = result.workspace;
-    activateBranchPath(result.branch.id);
     activeTextSelection = null;
     pendingTextBranchSelection = null;
     textSelectionStartBlockId = null;
     selectedBlockIds = new Set();
     window.getSelection()?.removeAllRanges();
   } catch (error) {
+    pendingThreadPreview = null;
     alert(error.message);
   } finally {
     setBusy(false);
+  }
+  if (pendingResult) {
+    pendingThreadPreview = null;
+    workspace = pendingResult.workspace;
+    openBranchById(pendingResult.branch.id);
   }
 }
 
@@ -1567,8 +1855,18 @@ function depthMenuEntries() {
 function branchSubtitle(branch) {
   const source = workspace.blocks.find((block) => block.id === branch.sourceBlockId);
   if (!source) return 'Branch';
-  const text = source.content.replace(/\s+/g, ' ').trim();
+  return branchSubtitleForContent(source.content);
+}
+
+function branchSubtitleForContent(content = '') {
+  const text = content.replace(/\s+/g, ' ').trim();
   return text.length > 68 ? `${text.slice(0, 68)}...` : text;
+}
+
+function shortText(content = '', fallback = 'Thread') {
+  const text = content.replace(/\s+/g, ' ').trim();
+  if (!text) return fallback;
+  return text.length > 42 ? `${text.slice(0, 42)}...` : text;
 }
 
 function hideDepthMenu() {
@@ -1603,10 +1901,19 @@ document.addEventListener('click', (event) => {
 async function askColumnQuestion(block, question) {
   if (!question?.trim() || isBusy) return;
   if (!block) return;
+  const trimmedQuestion = question.trim();
+  const parentBranchId = parentBranchIdForBlock(block.id);
+  const parentBranch = workspace.branches.find((branch) => branch.id === parentBranchId);
+  pendingThreadPreview = {
+    parentPaneId: columnIdForBlock(block),
+    title: block.title,
+    sourceSummary: branchSubtitleForContent(block.content),
+    question: trimmedQuestion,
+    depth: parentBranch ? parentBranch.depth + 1 : 1,
+  };
   setBusy(true);
+  let pendingResult = null;
   try {
-    const parentBranchId = parentBranchIdForBlock(block.id);
-    const parentBranch = workspace.branches.find((branch) => branch.id === parentBranchId);
     const previewBranch = {
       id: 'preview-branch',
       conversationId: workspace.conversationId,
@@ -1617,19 +1924,26 @@ async function askColumnQuestion(block, question) {
       columnOrder: workspace.branches.length + 1,
       isOpen: true,
     };
-    const context = buildBranchContext({ ...workspace, branches: [...workspace.branches, previewBranch] }, previewBranch.id, question.trim());
+    const context = buildBranchContext({ ...workspace, branches: [...workspace.branches, previewBranch] }, previewBranch.id, trimmedQuestion);
     const payload = await requestAssistantResponse(context, { messageId: createId('message') });
-    const result = appendBranchAnswer(workspace, block.id, question.trim(), payload.message.content, { parentBranchId });
-    workspace = result.workspace;
-    activateBranchPath(result.branch.id);
+    pendingResult = appendBranchAnswer(workspace, block.id, trimmedQuestion, payload.message.content, { parentBranchId });
   } catch (error) {
+    pendingThreadPreview = null;
     alert(error.message);
   } finally {
+    // setBusy(false) renders with the OLD workspace (no new branch visible yet).
+    // workspace is updated AFTER this so that openBranchById triggers the depth
+    // transition animation cleanly without an intermediate peek-state flash.
     setBusy(false);
+  }
+  if (pendingResult) {
+    pendingThreadPreview = null;
+    workspace = pendingResult.workspace;
+    openBranchById(pendingResult.branch.id);
   }
 }
 
-function renderColumnComposer(placeholder, onSubmit) {
+function renderColumnComposer(placeholder, onSubmit, description = '') {
   const footer = document.createElement('footer');
   footer.className = 'column-composer';
   ['pointerdown', 'pointerup', 'click'].forEach((eventName) => {
@@ -1640,6 +1954,12 @@ function renderColumnComposer(placeholder, onSubmit) {
   const textarea = document.createElement('textarea');
   textarea.rows = 2;
   textarea.placeholder = placeholder;
+  if (description) {
+    const hint = document.createElement('p');
+    hint.className = 'composer-hint';
+    hint.textContent = description;
+    footer.append(hint);
+  }
   const actions = document.createElement('div');
   actions.className = 'composer-actions';
   const tools = document.createElement('div');
@@ -1665,9 +1985,9 @@ function renderColumnComposer(placeholder, onSubmit) {
 }
 
 function renderBranchQuestionComposer(block) {
-  const footer = renderColumnComposer(`Ask about "${block.title}"`, async (question) => {
+  const footer = renderColumnComposer(`Reply to "${block.title}"`, async (question) => {
     await askColumnQuestion(block, question);
-  });
+  }, '선택한 블록을 기준으로 질문하면 하위 브랜치가 만들어집니다.');
   footer.classList.add('branch-question-composer');
   const cancel = button('Cancel', () => {
     pendingBranchBlockId = null;
@@ -1682,7 +2002,7 @@ function renderTextSelectionQuestionComposer(selection) {
   const preview = selection.text.length > 38 ? `${selection.text.slice(0, 38)}...` : selection.text;
   const footer = renderColumnComposer(`Ask about selected text: "${preview}"`, async (question) => {
     await askTextSelectionQuestion(selection, question);
-  });
+  }, '선택한 텍스트 블록을 기준으로 질문하면 하위 브랜치가 만들어집니다.');
   footer.classList.add('branch-question-composer');
   const cancel = button('Cancel', () => {
     pendingTextBranchSelection = null;

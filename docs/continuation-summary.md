@@ -26,11 +26,16 @@ The product should feel like ChatGPT with branching added, not like a landing pa
   - `Notes`: placeholder for branch-derived research notes.
   - `Synthesis`: summary area.
 - The top workspace bar was removed. Settings, provider pill, and synthesis controls live in the sidebar.
+- As of Build 075, the workspace is moving from Finder-style columns to a compact chat-thread model inspired by Slack/Google Chat.
+- The screen should show at most two depths:
+  - Left pane: the full parent conversation.
+  - Right pane: the currently selected child thread.
+- When the user enters a deeper thread, the previous current thread becomes the parent pane and the new child thread appears on the right.
 - Dev build badge appears only on local/dev hosts in the bottom-right corner.
 
 ## Current Build
 
-Current implementation build: `063`.
+Current implementation build: `078`.
 
 Build number locations:
 
@@ -62,6 +67,18 @@ Branching rules:
 ## Interaction Rules
 
 - First demo open should show depth 0 only.
+- Branches should feel like message threads, not like an endlessly scrolling set of columns.
+- Thread answers should be displayed as a normal user/assistant message timeline.
+- Blocks inside assistant messages remain branchable, but they live inside chat bubbles.
+- The parent side should show the whole parent conversation, not only the selected source block.
+- Blocks show a compact branch/thread icon at the bottom only when a branch already exists. Clicking that icon opens the existing child thread on the right.
+- Left-clicking a paragraph block only highlights the whole block. It must not navigate, rerender into another thread, or open a composer by itself.
+- Build 077 makes plain block clicks stop at the block event handler and only update `.selected` classes in the existing DOM. It does not call `render()`, does not lock scroll, and does not let the click bubble to document-level cleanup handlers.
+- Build 078 tightens the responsive layout: collapsed sidebar becomes icon-letter only, thread panes get inner padding, and split thread view collapses to a single active pane on medium/small screens to avoid clipping.
+- Right-clicking a paragraph block opens a single `Make a branch` menu. Choosing it opens the bottom question composer with explanatory copy saying the question will create a child branch.
+- Drag-selecting text inside one block opens a `Make a branch` menu on mouse release. Choosing it opens the bottom question composer with explanatory copy saying the question will create a child branch from the selected text block.
+- Features that conflict with those rules should be removed or disabled.
+- Non-root thread headers include a compact left-side parent/back icon and dot breadcrumb for the depth path.
 - The user should open a branch by:
   1. Selecting/right-clicking a whole block and choosing `Make a branch`, or
   2. Drag-selecting text inside a single block and choosing `Make a branch`.
@@ -103,7 +120,7 @@ Symptoms seen by the user:
 - Hover movement was visible, but branch navigation did not clearly animate.
 - The desired effect is: when going to the next depth, the current column visibly narrows while the next column expands. When going upward, the parent column expands back.
 
-Current Build 063 approach:
+Build 063 approach:
 
 - During a depth transition, the actual rendered columns are temporarily hidden.
 - A dedicated `.depth-transition-stage` is placed over the workspace.
@@ -139,6 +156,12 @@ If animation still looks wrong, next debugging step:
 3. Verify whether the stage appears for the full 1.85 seconds.
 4. If the stage appears but width does not animate, the issue is CSS keyframes/layout.
 5. If the stage does not appear, the issue is transition capture/render timing.
+
+Build 068 direction:
+
+- The UI is no longer relying on the multi-column depth animation as the main navigation metaphor.
+- Depth navigation should be redesigned around a two-pane thread layout.
+- Any future animation should be a simpler thread-pane slide/fade, not a full Finder-column width morph.
 
 ## Testing Checklist
 
