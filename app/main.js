@@ -12,11 +12,20 @@ import {
 } from '../src/domain/workspace-store.js';
 import { buildBranchContext } from '../src/domain/context-builder.js';
 import { createId } from '../src/utils/ids.js';
-import { fetchRuntimeConfig, requestAssistantResponse, saveRuntimeSettings } from '../src/domain/api-client.js';
+import {
+  askPaperQuestion,
+  fetchRuntimeConfig,
+  requestAssistantResponse,
+  saveRuntimeSettings,
+  uploadPaper,
+} from '../src/domain/api-client.js';
 
-const APP_BUILD = '078';
+const APP_BUILD = '079';
 const questionInput = document.querySelector('#questionInput');
 const startButton = document.querySelector('#startButton');
+const attachPaperButton = document.querySelector('#attachPaperButton');
+const paperFileInput = document.querySelector('#paperFileInput');
+const paperAttachmentStatus = document.querySelector('#paperAttachmentStatus');
 const synthesizeButton = document.querySelector('#synthesizeButton');
 const settingsButton = document.querySelector('#settingsButton');
 const sidebarToggle = document.querySelector('#sidebarToggle');
@@ -62,6 +71,7 @@ let allowSelectionBranchFromDrag = false;
 let lastRenderedActiveColumnId = null;
 let activeColumnTransition = 'none';
 let columnTransitionAnimation = null;
+let attachedPaperFile = null;
 
 showDevelopmentBuildBadge();
 
@@ -69,6 +79,15 @@ startButton.addEventListener('click', async () => {
   const question = questionInput.value.trim();
   if (!question || isBusy) return;
   await startConversation(question);
+});
+
+attachPaperButton.addEventListener('click', () => {
+  paperFileInput.click();
+});
+
+paperFileInput.addEventListener('change', () => {
+  attachedPaperFile = paperFileInput.files?.[0] || null;
+  renderPaperAttachmentStatus();
 });
 
 questionInput.addEventListener('keydown', (event) => {
@@ -109,6 +128,9 @@ newChatButton.addEventListener('click', () => {
   pendingBranchBlockId = null;
   pendingTextBranchSelection = null;
   activeTextSelection = null;
+  attachedPaperFile = null;
+  paperFileInput.value = '';
+  renderPaperAttachmentStatus();
   questionInput.value = '';
   render();
   questionInput.focus();
@@ -266,17 +288,35 @@ function render() {
 async function startConversation(question) {
   setBusy(true);
   try {
-    const payload = await requestAssistantResponse([
-      { role: 'user', content: question },
-    ], { messageId: createId('message') });
-    workspace = createWorkspaceFromAssistant(question, payload.message.content);
+    const answer = attachedPaperFile
+      ? await askInitialPaperQuestion(question)
+      : await askInitialAssistantQuestion(question);
+    workspace = createWorkspaceFromAssistant(question, answer);
     mobileActiveColumn = 'root';
     questionInput.value = '';
+    attachedPaperFile = null;
+    paperFileInput.value = '';
+    renderPaperAttachmentStatus();
   } catch (error) {
     alert(error.message);
   } finally {
     setBusy(false);
   }
+}
+
+async function askInitialAssistantQuestion(question) {
+  const payload = await requestAssistantResponse([
+    { role: 'user', content: question },
+  ], { messageId: createId('message') });
+  return payload.message.content;
+}
+
+async function askInitialPaperQuestion(question) {
+  setPaperAttachmentStatus(`Uploading ${attachedPaperFile.name}...`);
+  const paper = await uploadPaper(attachedPaperFile, { title: attachedPaperFile.name.replace(/\.pdf$/i, '') });
+  setPaperAttachmentStatus(`Reading ${paper.originalName}...`);
+  const answer = await askPaperQuestion(question, paper, { mode: 'paper_only' });
+  return answer.text;
 }
 
 function setBusy(value) {
@@ -303,6 +343,22 @@ function renderProviderStatus() {
   providerStatusEl.className = runtimeConfig.openaiConfigured
     ? 'provider-pill configured'
     : 'provider-pill';
+}
+
+function renderPaperAttachmentStatus() {
+  if (!paperAttachmentStatus) return;
+  if (!attachedPaperFile) {
+    paperAttachmentStatus.hidden = true;
+    paperAttachmentStatus.textContent = '';
+    return;
+  }
+  setPaperAttachmentStatus(`Attached PDF: ${attachedPaperFile.name}`);
+}
+
+function setPaperAttachmentStatus(text) {
+  if (!paperAttachmentStatus) return;
+  paperAttachmentStatus.hidden = false;
+  paperAttachmentStatus.textContent = text;
 }
 
 function showDevelopmentBuildBadge() {

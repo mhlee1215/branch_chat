@@ -453,6 +453,13 @@ h1 {
   gap: 10px;
 }
 
+.paper-attachment-status {
+  margin: -4px 0 0;
+  color: #176b59;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
 .tool-row {
   display: flex;
   gap: 6px;

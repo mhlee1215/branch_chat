@@ -69,11 +69,13 @@
           <textarea id="questionInput" rows="2" placeholder="Ask anything"></textarea>
           <div class="composer-actions">
             <div class="tool-row" aria-label="Tools">
-              <button class="tool-button" type="button" title="Attach">+</button>
+              <button class="tool-button" id="attachPaperButton" type="button" title="Attach PDF">+</button>
+              <input class="sr-only" id="paperFileInput" type="file" accept="application/pdf">
               <button class="tool-button" type="button" title="Tools">Tools</button>
             </div>
             <button id="startButton" type="button">Send</button>
           </div>
+          <p class="paper-attachment-status" id="paperAttachmentStatus" hidden></p>
         </div>
         <div class="prompt-chips" aria-label="Prompt shortcuts">
           <button type="button">Help me learn</button>
@@ -124,7 +126,7 @@
       </dialog>
     </main>
 
-    <div class="build-badge" id="buildBadge" hidden>Build 078</div>
+    <div class="build-badge" id="buildBadge" hidden>Build 079</div>
     <script type="module" src="/app/main.js"></script>
   </body>
 </html>

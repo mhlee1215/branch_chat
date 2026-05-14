@@ -35,7 +35,7 @@ The product should feel like ChatGPT with branching added, not like a landing pa
 
 ## Current Build
 
-Current implementation build: `078`.
+Current implementation build: `079`.
 
 Build number locations:
 
@@ -75,6 +75,12 @@ Branching rules:
 - Left-clicking a paragraph block only highlights the whole block. It must not navigate, rerender into another thread, or open a composer by itself.
 - Build 077 makes plain block clicks stop at the block event handler and only update `.selected` classes in the existing DOM. It does not call `render()`, does not lock scroll, and does not let the click bubble to document-level cleanup handlers.
 - Build 078 tightens the responsive layout: collapsed sidebar becomes icon-letter only, thread panes get inner padding, and split thread view collapses to a single active pane on medium/small screens to avoid clipping.
+- Build 079 adds the first OpenAI paper assistant backend path:
+  - `src/domain/paper-assistant.js` owns PDF upload, OpenAI vector store creation/reuse, file attachment, paper question calls, web-search mode selection, and citation extraction.
+  - `POST /api/papers/upload` accepts PDF form data and stores returned OpenAI file/vector IDs locally.
+  - `POST /api/chat/paper` asks with Responses API `file_search`, optionally adding `web_search` in modes that allow it.
+  - The first chat composer can attach one PDF and ask the initial question against that paper.
+  - `.branching-chat/` stores local paper metadata and remains ignored by Git.
 - Right-clicking a paragraph block opens a single `Make a branch` menu. Choosing it opens the bottom question composer with explanatory copy saying the question will create a child branch.
 - Drag-selecting text inside one block opens a `Make a branch` menu on mouse release. Choosing it opens the bottom question composer with explanatory copy saying the question will create a child branch from the selected text block.
 - Features that conflict with those rules should be removed or disabled.

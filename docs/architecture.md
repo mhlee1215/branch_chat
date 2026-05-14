@@ -26,6 +26,7 @@ The app currently runs as static files through `server.js`. This keeps local hos
 - Expo or React Native: consider only if the app needs a truly native UI layer.
 - Backend API: replace `src/domain/mock-ai.js` with API calls.
 - OpenAI provider: use `src/domain/openai-provider.js` to shape focused branch context for the Responses API.
+- Paper assistant API: use `src/domain/paper-assistant.js` for PDF upload, OpenAI vector store attachment, paper-grounded questions, and citation extraction.
 - Database: persist the workspace model from `src/domain/workspace-store.js`.
 
 ## Responsive Layout
@@ -52,11 +53,25 @@ Local OpenAI settings live in `.env`.
 ```text
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.4-mini
+OPENAI_DEFAULT_MODEL=gpt-5.4-mini
 ```
 
 The browser calls `/api/config` to show whether OpenAI is configured. Assistant calls go through `/api/assistant/respond`, so secrets never enter browser JavaScript.
 
 The Settings modal can update runtime provider settings through `POST /api/settings`. For local use, the user may optionally persist those settings to `.env`.
+
+## Paper Assistant Backend
+
+The PDF flow is intentionally server-side:
+
+- `POST /api/papers/upload` accepts a PDF, uploads it to OpenAI Files, creates or reuses an OpenAI vector store, attaches the file, and stores IDs locally.
+- `POST /api/chat/paper` resolves the stored paper/vector store, calls the Responses API with `file_search`, and returns assistant text plus raw citation annotations.
+- `paper_only` uses uploaded paper context only.
+- `paper_plus_web` adds the Responses API web search tool.
+- `implementation_mode` adds web search only when the user asks for official code, project pages, GitHub repositories, packages, or missing implementation details.
+- `review_mode` stays paper-only unless external search is explicitly requested later.
+
+The app does not implement custom chunking, embeddings, reranking, or a local vector database for this path. OpenAI hosted tools own that work. Runtime paper metadata is stored in `.branching-chat/`, which is ignored by Git.
 
 ## Finder-Style UI
 

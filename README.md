@@ -20,6 +20,7 @@ Current scope:
 - Direct branch count and max-depth indicators at every depth
 - Focused branch context builder
 - OpenAI provider adapter scaffold
+- OpenAI paper assistant API scaffold with PDF upload, vector store attachment, file search, and optional web search modes
 - In-app OpenAI settings modal
 - One-click demo workspace with varied depth 2 to 5 branches
 - Markdown-shaped rendering for code and math examples
@@ -50,6 +51,8 @@ Then edit `.env`:
 ```text
 OPENAI_API_KEY=your_api_key_here
 OPENAI_MODEL=gpt-5.4-mini
+# Optional alias supported by the paper assistant backend
+OPENAI_DEFAULT_MODEL=gpt-5.4-mini
 ```
 
 `OPENAI_API_KEY` is optional during UI development. If it is empty, the app runs in mock mode.
@@ -115,9 +118,20 @@ Runtime endpoints:
 ```text
 GET  /api/config
 POST /api/assistant/respond
+POST /api/papers/upload
+POST /api/chat/paper
 ```
 
 The browser never reads `OPENAI_API_KEY`. The server loads it from `.env` and calls OpenAI from the backend side.
+
+Paper-reading flow:
+
+1. The browser uploads a PDF to `POST /api/papers/upload`.
+2. The server uploads it to OpenAI Files, creates or reuses a vector store, and attaches the file.
+3. The browser sends questions to `POST /api/chat/paper`.
+4. The server calls the Responses API with `file_search` and returns text plus citation annotations when available.
+
+Local paper metadata is stored under `.branching-chat/` and is intentionally ignored by Git.
 
 The app also has a Settings modal. This supports a common local/BYOK workflow used by many AI web apps:
 
